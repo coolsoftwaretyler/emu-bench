@@ -13,26 +13,19 @@ The suite is the product. Our own collection run is merely the reference dataset
 
 | # | Decision | Choice |
 |---|----------|--------|
-| D1 | Purpose | Public content + build-decision input; rigor set at "will be attacked in public" |
-| D2 | Comparison set | Core three legs only (native / emulator / simulator). No Genymotion, no real devices. Writeup preempts the Genymotion question in limitations |
-| D3 | Fairness policy | Tuned config primary; Android Studio defaults re-run on the headline subset (cold boot, scroll p95, sqlite fsync, install); delta published as a finding |
-| D4 | Scope | Full seven-group matrix, including fence microbench and screen-recorded input-to-photon |
-| D5 | Hardware | Hardware-agnostic portable suite; no fixed machine matrix; thermal endurance ships as a scenario and findings emerge from community runs |
-| D6 | Setup bar | Doctor + guided setup; auto-install what's possible; skipped legs recorded in provenance |
-| D7 | Results flow | Versioned schema from first commit; community submissions by PR; aggregate table filtered on provenance |
-| D8 | Publishing | Single big reveal; repo private until publication; hypotheses committed before results and git history never rewritten (late-disclosed pre-registration) |
-| D9 | Rig app | Bare RN, latest stable, New Architecture, Hermes; deps: react-native-skia, sqlite lib, Reanimated, FlashList, react-navigation (transition scene only) |
-| D10 | Execution | Built by Claude sessions from self-contained tickets; humans review, run collections, own the writeup |
-
-Defaults adopted with the decisions: repo name `emu-bench`, MIT license, version policy = "latest stable at collection time, recorded in provenance" (no hard pins).
+| D1 | Comparison set | Core three legs only (native / emulator / simulator). No other targets | 
+| D2 | Scope | Full seven-group matrix, including fence microbench and screen-recorded input-to-photon |
+| D3 | Hardware | Hardware-agnostic portable suite; no fixed machine matrix; findings emerge from community runs |
+| D4 | Setup process | Doctor + guided setup; auto-install what's possible; skipped options get recorded in provenance |
+| D5 | Results flow | Use a versioned schema so we can accept community results on different hardware | 
+| D6 | Example app | Bare RN, latest stable, New Architecture, Hermes; deps: react-native-skia, sqlite lib, Reanimated, FlashList, react-navigation | 
 
 ## 3. Non-goals (v1)
 
 - Intel Macs. The methodology depends on arm64-everywhere; the CLI refuses to run on x86_64 with an explanation.
 - Windows/Linux hosts, real devices, Genymotion, BlueStacks, cloud emulators.
-- CI-automated collection. Runs are attended by design — thermal hygiene (cooldowns, interleaving) requires a human-controlled machine.
+- CI-automated collection. Runs are attended by design 
 - Hosted results collection or dashboards (PR flow only).
-- Play-image variants beyond a documented spot-check.
 
 ## 4. Repository layout
 
@@ -40,7 +33,6 @@ Defaults adopted with the decisions: repo name `emu-bench`, MIT license, version
 emu-bench/
   PLAN.md            # methodology, hypotheses, controls
   SPEC.md            # this document
-  LICENSE            # MIT
   CONTRIBUTING.md    # how to submit a run (T14)
   tickets/           # self-contained work items, T00–T14
   bin/emu-bench      # CLI entrypoint (node)
@@ -58,7 +50,7 @@ Single entrypoint: `./bin/emu-bench <command>`. Implementation: Node ≥ 20, ESM
 
 ### `emu-bench doctor`
 
-Detects and reports per-leg readiness; fixes what it can; prints exact instructions for what it can't. Never modifies anything without printing what it is about to do.
+Detects and reports readiness to run the suite; fixes what it can; prints exact instructions for what it can't. Never modifies anything without printing what it is about to do.
 
 | Check | Auto-fix | Manual instruction |
 |---|---|---|
@@ -76,7 +68,7 @@ Exit code 0 = at least legs A+B+C runnable for Groups 1–6. Every unmet optiona
 
 ### `emu-bench run [--groups 1-7] [--legs a,b,c] [--config tuned|default|both] [--label NAME] [--endurance]`
 
-Default behavior encodes D3: full matrix on the tuned config, then the headline subset (cold boot, S-list scroll, sqlite fsync-heavy, install) re-run on the default config. Orchestration hygiene per PLAN §5: interleaved legs, 2 warmup discards, n≥10 macro / n≥30 micro, cooldown after GPU-heavy scenes, CV computed per benchmark and flagged when > 10%. Writes `results/<chip-slug>-<date>-<label>.json`.
+Default behavior: full matrix on the tuned config, then the headline subset (cold boot, S-list scroll, sqlite fsync-heavy, install) re-run on the default config. Orchestration hygiene per PLAN §5: interleaved legs, 2 warmup discards, n≥10 macro / n≥30 micro, cooldown after GPU-heavy scenes, CV computed per benchmark and flagged when > 10%. Writes `results/<chip-slug>-<date>-<label>.json`.
 
 ### `emu-bench aggregate [--out md|csv]`
 
@@ -84,14 +76,14 @@ Reads `results/*.json`, validates against `schema/v1.json`, filters runs with in
 
 ## 6. Device configurations
 
-**Tuned AVD (`bench-tuned`)** — the physics question:
+**Tuned AVD (`bench-tuned`)**:
 
 - `hw.cpu.ncore` = `sysctl hw.perflevel0.logicalcpu` (P-core count, computed per machine)
 - `hw.ramSize` = 8192
 - launched with `-gpu host`; snapshot behavior explicit per test (`-no-snapshot-load` for cold boots)
 - image: latest stable `google_apis` arm64 (Google APIs, not Play — `adb root` required)
 
-**Default AVD (`bench-default`)** — the product question: created via `avdmanager` with the pixel-class device profile and an unmodified `config.ini`. Whatever the defaults turn out to be **is the measurement**; the actual values are recorded in provenance. (Known caveat, documented in the writeup: Android Studio's GUI applies slightly different defaults than `avdmanager`; we measure the latter and say so.)
+**Default AVD (`bench-default`)**: created via `avdmanager` with the pixel-class device profile and an unmodified `config.ini`. Whatever the defaults turn out to be **is the measurement**; the actual values are recorded. (Known caveat, documented in the writeup: Android Studio's GUI applies slightly different defaults than `avdmanager`; we measure the latter and say so.)
 
 **iOS Simulator**: newest iPhone device type of the installed newest runtime. No perf-relevant config exists; one configuration only.
 
@@ -125,8 +117,6 @@ Reads `results/*.json`, validates against `schema/v1.json`, filters runs with in
   "notes": ""
 }
 ```
-
-Rules: raw samples always included (aggregation recomputes stats; nobody has to trust our percentile math); ratios are **derived at aggregate time** from leg-A samples, never stored; a run missing machine or toolchain fields is rejected by `aggregate`.
 
 ## 8. Kernel suite (Group 1)
 
@@ -193,7 +183,3 @@ All scripted under `src/scenarios/`, all emitting into the same results schema:
 3. `aggregate` renders the comparison table from ≥2 results files, including the tuned-vs-default delta table.
 4. Every hypothesis H1–H9 in PLAN.md maps to at least one benchmark id emitting data (H9 via `--endurance`).
 5. A second person (or fresh Claude session) reproduces a run from README instructions alone.
-
-## 14. Publication constraints (D8)
-
-Repo stays private until the reveal. Hypotheses (PLAN.md §6) were committed before any implementation or results; **git history is never rewritten** — no squash, no force-push — so timestamps serve as late-disclosed pre-registration. The writeup's tables are generated by `aggregate` from committed results files.

@@ -29,11 +29,11 @@ This suite is designed so that either claim can lose. The output doubles as a re
 | A | macOS native process | Baseline = 1.0 |
 | B | Android Emulator — arm64 AVD, HVF, `-gpu host` (Google APIs image, not Play, so `adb root` works) | System under test |
 | C | iOS Simulator — arm64 processes on the macOS kernel, Metal direct to host GPU | Reference "doesn't suck" |
-*(Decision D2: a fourth leg of real devices, and additional emulators like Genymotion, were considered and cut for v1 — the suite and writeup scope themselves to "Google's emulator vs Apple's simulator on a Mac," and the limitations section preempts both questions.)*
+*(Decision: a fourth leg of real devices, and additional emulators like Genymotion, were considered and cut for v1 — the suite and writeup scope themselves to "Google's emulator vs Apple's simulator on a Mac," and the limitations section preempts both questions.)*
 
 Key facts that make this fair: Apple Silicon, the Android guest, and the simulator all execute arm64. The simulator is not a VM — its processes run on the host kernel. Leg B pays for a guest Linux kernel, virtio devices, and GLES/Vulkan→gfxstream→Metal translation; leg C pays almost nothing. Quantifying that difference *is the experiment*.
 
-**Hardware (decision D5):** no fixed machine matrix. The suite is hardware-agnostic, portable software that anyone runs on their own Apple Silicon Mac; ratios-to-native-baseline make results comparable across machines, and machine fingerprinting in the results provenance is a core feature. Our own run (M3 Max) is merely the reference dataset. The 10-minute thermal endurance scenario ships in the suite, and H9's thermal findings emerge from community runs on passively-cooled machines rather than from a machine we own.
+**Hardware:** no fixed machine matrix. The suite is hardware-agnostic, portable software that anyone runs on their own Apple Silicon Mac; ratios-to-native-baseline make results comparable across machines, and machine fingerprinting in the results provenance is a core feature. Our own run (M3 Max) is merely the reference dataset. The 10-minute thermal endurance scenario ships in the suite, and H9's thermal findings emerge from community runs on passively-cooled machines rather than from a machine we own.
 
 ## 4. Benchmark matrix
 
@@ -63,10 +63,8 @@ Emit JSON lines (`{bench, ns_per_op, ...}`); the runner aggregates.
 
 **Predictions:** compute kernels within ~10% across all legs. Timer/syscall/context-switch may be 2–10× worse in the guest — and that matters, because a JS runtime is timer- and wakeup-heavy.
 
-**Day-0 shortcut:** Geekbench 6 CPU (arm64 APK inside the emulator vs native macOS build — same published workloads) approximates this group in an hour, minus the syscall micros. No simulator leg, but B/A is the headline number anyway.
-
 ### Group 2 — JavaScript on Hermes (identical engine, identical bytecode)
-*Isolates: environment tax on the RN JS thread. No "ART vs JSC" excuses possible.*
+*Isolates: environment tax on the RN JS thread.*
 
 Scenes inside the rig app, timed with `performance.now()`, run in release mode:
 
@@ -143,7 +141,7 @@ Identical JS via op-sqlite:
 | Power/thermals | AC power, fixed brightness, other apps quit, `caffeinate` held, 2-min cooldown after GPU-heavy scenes |
 | AVD | arm64-v8a Google APIs image, latest stable API level; `hw.cpu.ncore` = P-core count; `hw.ramSize=8192`; `-gpu host`; snapshot behavior explicit per test |
 | Simulator | Current-generation iPhone device type, current iOS runtime |
-| Config policy (D3) | Tuned AVD is primary for the full matrix; the headline subset (cold boot, `list.scroll` p95, `sqlite.insert_fsync`, rig install) is re-run on an unmodified-defaults AVD and the tuned-vs-default delta is published as its own finding |
+| Config policy | Tuned AVD is primary for the full matrix; the headline subset (cold boot, `list.scroll` p95, `sqlite.insert_fsync`, rig install) is re-run on an unmodified-defaults AVD and the tuned-vs-default delta is published as its own finding |
 | App builds | One RN codebase, two targets; release config (Hermes bytecode precompiled, dev menu off, New Architecture on). Dev-mode builds used **only** for the fast-refresh test |
 | Animations | System animations ON for interaction tests (that's the shipped experience), consistent across legs |
 | Runs & stats | n≥10 macro / n≥30 micro; discard 2 warmups; **interleave legs (A,B,C,A,B,C…)** rather than blocking, to spread thermal drift; report median + p95; flag CV > 10% as unstable |
@@ -165,25 +163,7 @@ Identical JS via op-sqlite:
 
 Reconciliation logic: if H1/H3 hold while H4/H6/H7/H8 confirm, then *both* prior claims were right — throughput is fine and the experience is genuinely bad, because the experience lives in the tails. If H1 fails, execution speed itself is the problem and the tier-2 VMM work moves up the priority list.
 
-## 7. Phases & deliverables
-
-- **Phase 0 — smoke tests (half a day, no code, [T00](tickets/T00-phase0-smoke-run.md)):** Geekbench 6 B-vs-A; boot stopwatch; `adb push` MB/s; quickboot failure count over 10 launches. Sanity-check that gaps are roughly where predicted; revise the plan if not. Commands in the appendix.
-- **Phase 1 — spec + tickets (done 2026-08-28):** decisions locked in plan review; contract in [SPEC.md](SPEC.md); work items T00–T14 in [tickets/](tickets/).
-- **Phase 2 — build (~5–7 build-days across sessions):** execute T01–T13 per the dependency order in [tickets/README.md](tickets/README.md). Full matrix per decision D4, including the fence microbench and screen-recorded input-to-photon.
-- **Phase 3 — reference collection (T13 rehearsal + T14):** full run on the M3 Max reference machine; results committed as the first dataset entry.
-- **Phase 4 — write-up + single reveal (decision D8):** repo goes public together with the writeup; all published tables generated by `emu-bench aggregate` from committed results. Hypotheses (§6) remain committed before any results, and git history is never rewritten, so timestamps serve as late-disclosed pre-registration.
-
-Repository layout is specified in SPEC.md §4.
-
-## 8. Threats to validity (known and accepted)
-
-- **Skia GL-vs-Metal backend asymmetry** (Group 3): representative of shipped RN reality, but not a pure gfxstream measurement. The native fence test (Group 4) partially disambiguates.
-- **The simulator is not an iPhone.** This suite compares *developer experiences on a Mac*, not device performance. Real-device legs were cut for v1 (D2), so no claims are made about emulator overhead relative to physical Android hardware.
-- **No third-party emulators.** Genymotion/BlueStacks-class comparisons were deliberately cut for v1 (D2); the writeup says so up front rather than letting "did you try Genymotion?" land in the comments. It remains the natural follow-up piece — it directly tests whether a better product shell on the same core moves the needles.
-- **RN-centric.** Results generalize partially to Flutter (same VM/GPU/IO substrate) and native dev (everything except the Hermes group).
-- **Injection-path asymmetry** in end-to-end latency (Maestro drivers differ) — mitigated by making the in-app measurement primary.
-- **Emulator window scale** affects presentation cost: pin the window to 1:1 device pixels and note it.
-- **Image variant:** Google APIs images (needed for `adb root`) differ slightly from Play images in background services. Document; spot-check one Play-image run.
+Repository layout is specified in SPEC.md.
 
 ## Appendix — Phase 0 commands
 
@@ -211,5 +191,3 @@ Host power during a manual 60 s scroll session:
 ```bash
 sudo powermetrics --samplers cpu_power,gpu_power -i 1000 -n 60
 ```
-
-Geekbench: install the arm64 APK in the emulator, run CPU benchmark; run the macOS build natively; compare single/multi-core scores directly (same published workloads).

@@ -1,0 +1,6 @@
+- Why do we need Maestro?
+- What is powermetrics?
+- Help me improve the docs on emu-bench run, it doesn't really say what it *does*. We need to be a lot clearer about what the benchmarking is running.
+- results schema: can we also add data types to the values?
+- What is fence? what does it tell us?
+- What do the workloads actually tell us as well in the c binary?
