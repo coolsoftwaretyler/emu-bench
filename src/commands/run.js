@@ -2,10 +2,13 @@
 /**
  * `emu-bench run` (SPEC.md §5, §1). T01 scope: execute whatever is in the
  * registry for the requested groups on leg A, with full provenance, and
- * write a schema-valid results file. Real orchestration (interleaved legs,
- * cooldowns, multi-leg execution contexts for B/C) lands in T13; this
- * command is deliberately the minimal slice that makes the registry ->
- * results pipeline real end to end.
+ * write a schema-valid results file. T03 extended execution to legs B/C
+ * for Group 1's kernel entries (src/kernels.js) — each entry's own
+ * `run(ctx)` now owns its leg's execution mechanics, so this command no
+ * longer hardcodes a leg-A-only gate. Full orchestration hygiene
+ * (interleaved legs, cooldowns, multi-group scheduling policy) still
+ * lands in T13; this command remains the minimal slice that makes the
+ * registry -> results pipeline real end to end.
  */
 
 import { requireAppleSilicon } from '../arm64-gate.js';
@@ -15,10 +18,10 @@ import { summarize, discardWarmups } from '../stats.js';
 import { validateAgainstV1 } from '../schema.js';
 import { writeResults } from '../results-writer.js';
 
-// Registering the built-in demo benchmark as a side effect of importing it.
-// Real Group 1+ benchmarks (T03+) will import similarly from bin/emu-bench
-// or from here.
+// Registering built-in benchmarks as a side effect of importing them.
 import '../benchmarks/demo.js';
+import { registerKernelBenchmarks } from '../kernels.js';
+registerKernelBenchmarks();
 
 const WARMUP_DISCARDS = 2;
 
@@ -79,17 +82,15 @@ export async function runCommand(flags) {
 
   for (const entry of entries) {
     for (const leg of entry.legs.filter((l) => legs.includes(l))) {
-      if (leg !== 'a') {
-        // T01 scope is leg A only (ticket line 13: "run(ctx) should
-        // execute whatever is in the registry" on leg A; legs B/C
-        // execution contexts land with the tickets that need devices).
-        skipped.push({
-          id: entry.id,
-          leg,
-          reason: 'leg not yet wired up (T01 scaffold executes leg A only)',
-        });
-        continue;
-      }
+      // T01 scaffolded leg A only; each entry's own `run(ctx)` is now
+      // responsible for its leg's execution mechanics (T03's kernel
+      // entries, registered via src/kernels.js, handle legs A/B/C
+      // themselves — local exec, adb push+shell, and simctl spawn
+      // respectively — rather than routing through a generic `ctx.exec`).
+      // An entry that declares support for a leg it can't actually run
+      // (e.g. no device attached) throws from `run(ctx)` and lands in the
+      // catch below as a skip with that leg's real reason, instead of a
+      // blanket "not wired up" skip for every non-A leg.
       try {
         /** @type {import('../types.js').RunContext} */
         const ctx = {
