@@ -51,7 +51,7 @@ function camelizeFlags(flags) {
 const USAGE = `emu-bench — Android Emulator vs iOS Simulator benchmark suite
 
 Usage:
-  emu-bench doctor
+  emu-bench doctor [--json]
   emu-bench run [--groups 1-7] [--legs a,b,c] [--config tuned|default|both] [--label NAME] [--endurance] [--allow-battery]
   emu-bench aggregate [--out md|csv]
 
@@ -66,7 +66,7 @@ export async function main(argv) {
 
   switch (command) {
     case 'doctor':
-      await doctorCommand();
+      await doctorCommand(/** @type {any} */ (flags));
       break;
     case 'run':
       await runCommand(/** @type {any} */ (flags));

@@ -204,7 +204,13 @@ async function getSdkInfo() {
   let systemImage = null;
   let apiLevel = 0;
   for (const line of imageLines) {
-    const match = line.match(/system-images;android-(\d+);google_apis[^;]*;arm64-v8a/);
+    // Exact tag match on "google_apis" (SPEC.md §6: "Google APIs, not Play
+    // — adb root required") — excludes google_apis_playstore/_ps16k/etc,
+    // which `[^;]*` would otherwise also match. API level can be decimal
+    // (e.g. "android-37.0"), so `\d+` alone (no trailing `;` requirement
+    // right after the digits) is wrong — it must allow an optional
+    // `.\d+` before the next `;`.
+    const match = line.match(/system-images;android-(\d+(?:\.\d+)?);google_apis;arm64-v8a/);
     if (match) {
       const level = Number(match[1]);
       if (level > apiLevel) {
