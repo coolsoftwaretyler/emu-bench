@@ -1,6 +1,6 @@
 # T00: Phase 0 smoke run (manual, no code)
 
-**Status:** open
+**Status:** parked — eyeball power measurement needs interactive sudo powermetrics; a human must run it and append results (2026-08-29)
 **Depends on:** nothing — can run any time, on any Apple Silicon Mac with Android SDK + Xcode
 **Blocks:** nothing (informs plan revisions)
 
