@@ -6,7 +6,7 @@
 
 ## Context
 
-"The emulator burns 3× the watts to show the same list" is the stat that ends arguments (PLAN.md Group 7, hypothesis H9). Power via `powermetrics` (needs sudo — requested up front with an explanation, else the group is skipped with a named reason). The endurance scenario ships for community runners on passively-cooled machines; we don't own the thermal finding, the dataset does (decision D5).
+"The emulator burns 3× the watts to show the same list" is the stat that ends arguments (PLAN.md Group 7, hypothesis H9). Power via `powermetrics` (needs sudo — requested up front with an explanation, else the group is skipped with a named reason). The endurance scenario ships for community runners on passively-cooled machines; we don't own the thermal finding, the dataset does (decision D3, SPEC.md §2).
 
 ## Scope
 

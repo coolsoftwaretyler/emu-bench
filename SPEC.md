@@ -86,7 +86,7 @@ Exit code 0 = at least legs A+B+C runnable for Groups 1–6. Every unmet optiona
 
 ### `emu-bench run [--groups 1-7] [--legs a,b,c] [--config tuned|default|both] [--label NAME] [--endurance]`
 
-The experiment itself (see §1 for the step-by-step). Default behavior: full matrix on the tuned config, then the headline subset (cold boot, S-list scroll, sqlite fsync-heavy, install) re-run on the default config. Orchestration hygiene per PLAN §5: interleaved legs, 2 warmup discards, n≥10 macro / n≥30 micro, cooldown after GPU-heavy scenes, CV computed per benchmark and flagged when > 10%. Writes `results/<chip-slug>-<date>-<label>.json`.
+The experiment itself (see §1 for the step-by-step). Default behavior: full matrix on the tuned config, then the headline subset (cold boot, `list.scroll`, `sqlite.insert_fsync`, rig install) re-run on the default config. Orchestration hygiene per PLAN §5: interleaved legs, 2 warmup discards, n≥10 macro / n≥30 micro, cooldown after GPU-heavy scenes, CV computed per benchmark and flagged when > 10%. Writes `results/<chip-slug>-<date>-<label>.json`.
 
 Flags:
 
@@ -185,6 +185,7 @@ Two small command-line programs (separate from the rig app) plus one screen-reco
 
 - **Fence round-trip, Android:** NDK CLI binary, surfaceless EGL context, `glFinish` loop — render nothing, wait for the GPU to confirm completion, repeat — → µs/round-trip. If surfaceless EGL proves unavailable on the emulator, fallback = in-rig Skia `flushAndSubmit(sync)` scene, flagged in provenance as the fallback method.
 - **Fence round-trip, iOS sim:** CLI binary via `simctl spawn`, Metal command buffer + `waitUntilCompleted` loop — the same submit-and-wait lap, in Metal terms.
+- **Fence round-trip, macOS (leg A):** the same Metal submit→wait loop as a native host CLI, so fence results report as ratios to native like Group 1 (T08).
 - **Input-to-photon secondary:** script taps via Maestro, ffmpeg/avfoundation records the Mac screen at 60 fps, a frame-diff script counts frames from tap-marker to pixel change in the device window region. n≥30. Marked secondary in all reporting (injection paths differ per platform).
 
 ## 11. Host-side scenarios (Groups 6–7)

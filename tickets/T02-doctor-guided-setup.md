@@ -6,7 +6,7 @@
 
 ## Context
 
-Decision D6 (SPEC.md §2): a stranger's Mac goes from "RN dev machine" to "collecting benchmarks" in ~30 minutes via `emu-bench doctor` — auto-installing what's possible, printing exact instructions for the rest, and mapping every unmet optional dependency to a named skip that later appears in results provenance. Full check/fix table in SPEC.md §5; AVD definitions in SPEC.md §6.
+Decision D4 (SPEC.md §2): a stranger's Mac goes from "RN dev machine" to "collecting benchmarks" in ~30 minutes via `emu-bench doctor` — auto-installing what's possible, printing exact instructions for the rest, and mapping every unmet optional dependency to a named skip that later appears in results provenance. Full check/fix table in SPEC.md §5; AVD definitions in SPEC.md §6.
 
 ## Scope
 

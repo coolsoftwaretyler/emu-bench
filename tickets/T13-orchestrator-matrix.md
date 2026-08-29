@@ -6,7 +6,7 @@
 
 ## Context
 
-`emu-bench run` turns the registry into a disciplined collection session (SPEC.md §5, §12; PLAN.md §5 controls). Two policies come from plan review and must be code, not documentation: decision D3 (tuned config primary for everything; the **headline subset** — cold boot, `list.scroll` p95, `sqlite.insert_fsync`, `install.rig` — re-run on the default AVD) and the hygiene rules (interleaved legs, warmup discards, cooldowns, CV flagging, battery/thermal gates).
+`emu-bench run` turns the registry into a disciplined collection session (SPEC.md §5, §12; PLAN.md §5 controls). Two policies come from plan review and must be code, not documentation: the config policy (PLAN.md §5, SPEC.md §5 `run`) — tuned config primary for everything, with the **headline subset** — cold boot, `list.scroll` p95, `sqlite.insert_fsync`, `install.rig` — re-run on the default AVD — and the hygiene rules (interleaved legs, warmup discards, cooldowns, CV flagging, battery/thermal gates).
 
 ## Scope
 

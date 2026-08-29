@@ -6,7 +6,7 @@
 
 ## Context
 
-emu-bench is a portable benchmark suite (see [SPEC.md](../SPEC.md), esp. §4 layout, §5 CLI, §7 schema, §12 hygiene). This ticket creates the skeleton every other ticket plugs into. Constraints that matter: Node ≥ 20, ESM, **zero runtime dependencies**, no build step; arm64-only hard gate; git history must never be rewritten from here on (SPEC §14).
+emu-bench is a portable benchmark suite (see [SPEC.md](../SPEC.md), esp. §4 layout, §5 CLI, §7 schema, §12 hygiene). This ticket creates the skeleton every other ticket plugs into. Constraints that matter: Node ≥ 20, ESM, **zero runtime dependencies**, no build step; arm64-only hard gate; git history must never be rewritten from here on (pre-registration rule — see [tickets/README.md](README.md)).
 
 ## Scope
 

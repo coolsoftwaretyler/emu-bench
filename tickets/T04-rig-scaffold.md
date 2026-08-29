@@ -6,7 +6,7 @@
 
 ## Context
 
-The rig is one bare React Native app that runs identical workload code on Android and iOS (SPEC.md §9). Decision D9 pins the stack: latest stable RN, New Architecture, Hermes, and exactly these deps: `@shopify/react-native-skia`, `@shopify/flash-list`, `react-native-reanimated`, one maintained sqlite lib (choose op-sqlite-class at implementation time; record the choice + version in a `rig/DEPS.md`), `react-navigation` (transition scene only). Everything measured runs in **release** configuration; only the fast-refresh scenario (T10) uses dev mode.
+The rig is one bare React Native app that runs identical workload code on Android and iOS (SPEC.md §9). Decision D6 (SPEC.md §2) pins the stack: latest stable RN, New Architecture, Hermes, and exactly these deps: `@shopify/react-native-skia`, `@shopify/flash-list`, `react-native-reanimated`, one maintained sqlite lib (choose op-sqlite-class at implementation time; record the choice + version in a `rig/DEPS.md`), `react-navigation` (transition scene only). Everything measured runs in **release** configuration; only the fast-refresh scenario (T10) uses dev mode.
 
 ## Scope
 

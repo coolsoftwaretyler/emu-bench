@@ -6,7 +6,7 @@
 
 ## Context
 
-Every GPU sync point in the emulator is a guest↔host round trip; this probe measures that cost directly (PLAN.md Group 4, hypothesis H6). Two small native CLI binaries, one per platform, each timing a minimal submit→wait loop (SPEC.md §10). This was consciously kept in scope at full-matrix fidelity during plan review (decision D4), with a documented fallback if the Android path proves infeasible.
+Every GPU sync point in the emulator is a guest↔host round trip; this probe measures that cost directly (PLAN.md Group 4, hypothesis H6). Two small native CLI binaries, one per platform, each timing a minimal submit→wait loop (SPEC.md §10). This was consciously kept in scope at full-matrix fidelity during plan review (decision D2, SPEC.md §2), with a documented fallback if the Android path proves infeasible. A native macOS Metal variant serves as the leg-A baseline (SPEC.md §10) so the result reports as a ratio like Group 1.
 
 ## Scope
 
