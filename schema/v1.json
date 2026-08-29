@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/emu-bench/emu-bench/schema/v1.json",
+  "title": "emu-bench results v1",
+  "description": "Contract every results file must satisfy (SPEC.md §7). Every number the suite produces lands in a file of this shape.",
+  "type": "object",
+  "required": ["schemaVersion", "run", "machine", "toolchain", "config", "benchmarks", "skipped"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "run": {
+      "type": "object",
+      "required": ["timestamp", "label", "suiteGitSha"],
+      "additionalProperties": false,
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "label": { "type": "string" },
+        "suiteGitSha": { "type": "string" }
+      }
+    },
+    "machine": {
+      "type": "object",
+      "description": "Machine fingerprint (SPEC.md §7 machine).",
+      "required": [
+        "model",
+        "chip",
+        "pCores",
+        "eCores",
+        "ramGB",
+        "macosVersion",
+        "powerSource",
+        "thermalPressureStart"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "model": { "type": "string" },
+        "chip": { "type": "string" },
+        "pCores": { "type": "integer", "minimum": 0 },
+        "eCores": { "type": "integer", "minimum": 0 },
+        "ramGB": { "type": "number", "minimum": 0 },
+        "macosVersion": { "type": "string" },
+        "powerSource": { "type": "string" },
+        "thermalPressureStart": { "type": "string" }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "description": "Every external tool version captured at run start (SPEC.md §7 toolchain).",
+      "required": [
+        "xcode",
+        "iosRuntime",
+        "deviceType",
+        "emulatorVersion",
+        "systemImage",
+        "apiLevel",
+        "ndk",
+        "rnVersion",
+        "maestro",
+        "node"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "xcode": { "type": "string" },
+        "iosRuntime": { "type": "string" },
+        "deviceType": { "type": "string" },
+        "emulatorVersion": { "type": "string" },
+        "systemImage": { "type": "string" },
+        "apiLevel": { "type": "integer", "minimum": 0 },
+        "ndk": { "type": "string" },
+        "rnVersion": { "type": "string" },
+        "maestro": { "type": "string" },
+        "node": { "type": "string" }
+      }
+    },
+    "config": {
+      "type": "object",
+      "description": "Actual AVD config.ini values used this run (SPEC.md §6, §7).",
+      "additionalProperties": false,
+      "properties": {
+        "avdTuned": { "type": "object" },
+        "avdDefault": { "type": "object" }
+      }
+    },
+    "benchmarks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "group",
+          "id",
+          "leg",
+          "config",
+          "unit",
+          "n",
+          "warmupsDiscarded",
+          "samples",
+          "median",
+          "p95",
+          "p99",
+          "cv"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "group": { "type": "integer", "minimum": 0, "maximum": 7 },
+          "id": { "type": "string" },
+          "leg": { "type": "string", "enum": ["a", "b", "c"] },
+          "config": { "type": ["string", "null"] },
+          "unit": { "type": "string" },
+          "n": { "type": "integer", "minimum": 0 },
+          "warmupsDiscarded": { "type": "integer", "minimum": 0 },
+          "samples": {
+            "type": "array",
+            "items": { "type": "number" }
+          },
+          "median": { "type": "number" },
+          "p95": { "type": "number" },
+          "p99": { "type": "number" },
+          "cv": { "type": "number" }
+        }
+      }
+    },
+    "skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "leg", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "leg": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

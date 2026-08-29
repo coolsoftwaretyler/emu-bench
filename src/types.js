@@ -1,0 +1,82 @@
+// @ts-check
+/**
+ * Shared JSDoc typedefs for the results schema (SPEC.md §7) and the
+ * benchmark registry. This file has no runtime exports — it exists purely
+ * so other modules can `@import` these types via
+ * `import('./types.js').Machine` etc.
+ */
+
+/**
+ * @typedef {Object} Machine
+ * @property {string} model
+ * @property {string} chip
+ * @property {number} pCores
+ * @property {number} eCores
+ * @property {number} ramGB
+ * @property {string} macosVersion
+ * @property {string} powerSource
+ * @property {string} thermalPressureStart
+ */
+
+/**
+ * @typedef {Object} Toolchain
+ * @property {string} xcode
+ * @property {string} iosRuntime
+ * @property {string} deviceType
+ * @property {string} emulatorVersion
+ * @property {string} systemImage
+ * @property {number} apiLevel
+ * @property {string} ndk
+ * @property {string} rnVersion
+ * @property {string} maestro
+ * @property {string} node
+ */
+
+/**
+ * @typedef {Object} BenchmarkResult
+ * @property {number} group
+ * @property {string} id
+ * @property {string} leg
+ * @property {string} config
+ * @property {string} unit
+ * @property {number} n
+ * @property {number} warmupsDiscarded
+ * @property {number[]} samples
+ * @property {number} median
+ * @property {number} p95
+ * @property {number} p99
+ * @property {number} cv
+ */
+
+/**
+ * @typedef {Object} Skip
+ * @property {string} id
+ * @property {string} leg
+ * @property {string} reason
+ */
+
+/**
+ * A single leg's execution context, handed to a registered benchmark's
+ * `run(ctx)`. Later tickets (T02+) populate device handles for legs B/C;
+ * T01 only exercises leg A (local exec).
+ * @typedef {Object} RunContext
+ * @property {'a'|'b'|'c'} leg
+ * @property {'tuned'|'default'|null} config
+ * @property {(cmd: string, args: string[]) => Promise<{stdout: string, stderr: string}>} exec
+ *   Runs a command appropriate to this leg (leg A: local shell; leg B: adb
+ *   shell; leg C: simctl spawn — wired up as those legs are implemented).
+ */
+
+/**
+ * A benchmark registry entry (SPEC.md §4 "Design for per-leg execution
+ * contexts").
+ * @typedef {Object} BenchmarkEntry
+ * @property {string} id
+ * @property {number} group
+ * @property {string[]} legs supported leg letters, e.g. ["a"]
+ * @property {'micro'|'macro'} kind micro: n>=30, macro: n>=10 (PLAN.md §5)
+ * @property {string} unit
+ * @property {(ctx: RunContext) => Promise<number[]>} run returns raw samples
+ */
+
+export {};

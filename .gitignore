@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+
+# Rig app / native build outputs (T04+)
+rig/**/android/app/build/
+rig/**/android/.gradle/
+rig/**/ios/build/
+rig/**/ios/Pods/
+kernels/build/
+
+# Local scratch, never committed
+*.local.json
