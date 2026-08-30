@@ -24,6 +24,8 @@ import { registerKernelBenchmarks } from '../kernels.js';
 registerKernelBenchmarks();
 import { registerRigSceneBenchmarks } from '../rig-scenes.js';
 registerRigSceneBenchmarks();
+import { registerFenceBenchmarks } from '../fence.js';
+registerFenceBenchmarks();
 
 const WARMUP_DISCARDS = 2;
 
@@ -105,7 +107,14 @@ export async function runCommand(flags) {
             return run(cmd, args, { encoding: 'utf8' });
           },
         };
-        const rawSamples = await entry.run(ctx);
+        // An entry may return either a bare samples array or
+        // `{samples, method}` — the object form exists for probes whose
+        // measurement method is only known at runtime and must land in the
+        // results row (T08's fence.roundtrip: which context bootstrap the
+        // probe achieved per leg, or the flagged "skia-fallback").
+        const ran = await entry.run(ctx);
+        const rawSamples = Array.isArray(ran) ? ran : ran.samples;
+        const method = Array.isArray(ran) ? undefined : ran.method;
         const { kept, discarded } = discardWarmups(rawSamples, WARMUP_DISCARDS);
         const summary = summarize(kept, discarded);
         benchmarks.push({
@@ -114,6 +123,7 @@ export async function runCommand(flags) {
           leg,
           config: config === 'both' ? 'tuned' : config,
           unit: entry.unit,
+          ...(method !== undefined ? { method } : {}),
           ...summary,
         });
       } catch (/** @type {any} */ err) {

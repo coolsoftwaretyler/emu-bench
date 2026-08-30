@@ -93,10 +93,67 @@ $(IOSSIM_BIN): $(SRCS) sha256.h
 	@mkdir -p $(IOSSIM_DIR)
 	xcrun -sdk iphonesimulator clang -target arm64-apple-ios-simulator $(CFLAGS_COMMON) $(SRCS) -lz -lpthread -o $(IOSSIM_BIN)
 
+# ---- fence round-trip probes (Group 4, ticket T08) ----------------------
+#
+# SPEC.md §10 native probes: two small CLI programs timing one
+# submit→wait GPU lap, plus the same Metal loop built natively as the
+# leg-A baseline so the result reports as a ratio like Group 1.
+# `make fence` builds all three:
+#   build/android/fence_android  — EGL/GLES2 glFinish loop (leg B, adb shell)
+#   build/iossim/fence_iossim    — Metal waitUntilCompleted loop (leg C, simctl spawn)
+#   build/macos/fence_macos      — the SAME fence_iossim.m source compiled as a
+#                                  native macOS CLI (leg A), Group 1's
+#                                  identical-source philosophy applied to Metal.
+#
+# ObjC flags: no -std=c11/-Wpedantic here — those are C-dialect flags and
+# pedantic mode is noisy against the Metal framework headers; the fence
+# probes keep -O2 -Wall -Wextra parity with the kernel suite.
+
+OBJCFLAGS_COMMON := -O2 -Wall -Wextra -fobjc-arc
+FENCE_FRAMEWORKS := -framework Metal -framework Foundation
+
+FENCE_MACOS_BIN := $(MACOS_DIR)/fence_macos
+FENCE_ANDROID_BIN := $(ANDROID_DIR)/fence_android
+FENCE_IOSSIM_BIN := $(IOSSIM_DIR)/fence_iossim
+
+.PHONY: fence fence-macos fence-android fence-iossim
+fence: fence-macos fence-android fence-iossim
+fence-macos: $(FENCE_MACOS_BIN)
+fence-android: $(FENCE_ANDROID_BIN)
+fence-iossim: $(FENCE_IOSSIM_BIN)
+
+$(FENCE_MACOS_BIN): fence_iossim.m
+	@mkdir -p $(MACOS_DIR)
+	clang $(OBJCFLAGS_COMMON) fence_iossim.m $(FENCE_FRAMEWORKS) -o $(FENCE_MACOS_BIN)
+
+# Unlike the kernel suite's -static build, the fence probe links
+# dynamically: libEGL/libGLESv2 are shared system libraries on Android
+# (there is nothing to statically link against), and NDK-built dynamic
+# executables run fine from /data/local/tmp. -lm for the summary-line
+# sqrt (bionic ships libm separately from libc).
+$(FENCE_ANDROID_BIN): fence_android.c
+	@if [ -z "$(NDK_PATH)" ] || [ ! -x "$(ANDROID_CLANG)" ]; then \
+		echo "kernels/Makefile: NDK clang not found."; \
+		echo "  Set NDK_HOME to an NDK root, or install one under \$$ANDROID_HOME/ndk/<version>"; \
+		echo "  (tried: $(ANDROID_CLANG))"; \
+		exit 1; \
+	fi
+	@mkdir -p $(ANDROID_DIR)
+	$(ANDROID_CLANG) $(CFLAGS_COMMON) fence_android.c -lEGL -lGLESv2 -lm -o $(FENCE_ANDROID_BIN)
+
+# The versioned triple (vs the kernel suite's bare arm64-apple-ios-simulator)
+# matters for ARC: with no minimum OS version, clang assumes an ancient
+# deployment target and demands libarclite, which modern Xcode no longer
+# ships. iOS 15 is far below any runtime this suite targets (doctor
+# installs the newest one, SPEC.md §5).
+$(FENCE_IOSSIM_BIN): fence_iossim.m
+	@mkdir -p $(IOSSIM_DIR)
+	xcrun -sdk iphonesimulator clang -target arm64-apple-ios15.0-simulator $(OBJCFLAGS_COMMON) fence_iossim.m $(FENCE_FRAMEWORKS) -o $(FENCE_IOSSIM_BIN)
+
 # ---- all / clean --------------------------------------------------------
 
 .PHONY: all
-all: macos android iossim
+all: macos android iossim fence
 
 .PHONY: clean
 clean:

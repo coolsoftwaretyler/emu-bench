@@ -39,6 +39,9 @@
  * @property {string} leg
  * @property {string} config
  * @property {string} unit
+ * @property {string} [method] how this number was measured, when a probe
+ *   only knows at runtime (T08 fence.roundtrip: "egl-surfaceless" /
+ *   "egl-pbuffer" / "metal", or "skia-fallback" per SPEC.md §10)
  * @property {number} n
  * @property {number} warmupsDiscarded
  * @property {number[]} samples
@@ -76,7 +79,10 @@
  * @property {string[]} legs supported leg letters, e.g. ["a"]
  * @property {'micro'|'macro'} kind micro: n>=30, macro: n>=10 (PLAN.md §5)
  * @property {string} unit
- * @property {(ctx: RunContext) => Promise<number[]>} run returns raw samples
+ * @property {(ctx: RunContext) => Promise<number[] | {samples: number[], method?: string}>} run
+ *   returns raw samples — either a bare array, or `{samples, method}` when
+ *   the probe's measurement method is runtime-determined and belongs in
+ *   the results row (see BenchmarkResult.method)
  */
 
 export {};

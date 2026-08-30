@@ -108,6 +108,10 @@
           "leg": { "type": "string", "enum": ["a", "b", "c"] },
           "config": { "type": ["string", "null"] },
           "unit": { "type": "string" },
+          "method": {
+            "type": "string",
+            "description": "Optional: how this number was measured, for probes whose method is runtime-determined (T08 fence.roundtrip: egl-surfaceless / egl-pbuffer / metal, or skia-fallback per SPEC.md §10). Additive-optional, so files written before this field existed remain valid."
+          },
           "n": { "type": "integer", "minimum": 0 },
           "warmupsDiscarded": { "type": "integer", "minimum": 0 },
           "samples": {
