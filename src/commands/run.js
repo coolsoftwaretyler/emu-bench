@@ -22,6 +22,8 @@ import { writeResults } from '../results-writer.js';
 import '../benchmarks/demo.js';
 import { registerKernelBenchmarks } from '../kernels.js';
 registerKernelBenchmarks();
+import { registerRigSceneBenchmarks } from '../rig-scenes.js';
+registerRigSceneBenchmarks();
 
 const WARMUP_DISCARDS = 2;
 
