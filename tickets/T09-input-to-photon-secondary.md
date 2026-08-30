@@ -1,6 +1,6 @@
 # T09: Input-to-photon, secondary — screen-recorded end-to-end latency (Group 4)
 
-**Status:** open
+**Status:** parked — needs human: grant Screen Recording permission to Claude.app and launch Simulator.app GUI, then re-run photon leg (2026-08-30)
 **Depends on:** T07 (scene + tap flow), T02 (ffmpeg doctor check)
 **Blocks:** T13
 
