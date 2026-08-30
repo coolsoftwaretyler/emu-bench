@@ -1,0 +1,46 @@
+# touch.latency tap driver (ticket T07, PLAN.md §4 Group 4, H6). Shared YAML,
+# both legs -- Maestro resolves `appId`/`launchApp`/`openLink` against
+# whichever device is targeted (`-p android` / `-p ios`, or `--udid`), so no
+# per-platform branching is needed for the launch step itself; identical
+# commands run against both legs, which is the point (the injector's own
+# latency must not differ by platform).
+#
+# The `openLink` step is deliberately issued TWICE. Diagnosed during T07
+# development: on this Maestro (1.40.0)/Xcode(26.6)/simulator and Maestro/
+# emulator combination, a `launchApp` immediately followed by a single
+# `openLink` reliably lands the app back on the debug scene-list screen
+# instead of the target scene, on BOTH platforms -- confirmed not a timing
+# race (tested up to a 30s wait; a full simulator reboot ruled out a stale
+# accessibility daemon; Maestro's own captured accessibility hierarchy at
+# the failure point was pulled directly from its debug output and showed
+# the scene-list screen's text, not touch.latency's -- i.e. Maestro's own
+# element lookup was accurately reporting reality, not stale). A second
+# `openLink` call immediately after the first reliably recovers on both
+# platforms (verified across repeated runs). Root cause not fully isolated
+# (plausibly some one-time JS-bridge/URL-listener readiness the first
+# post-launchApp openLink races against) but the double-call workaround is
+# reliable and keeps the whole driver inside Maestro/YAML -- no fallback
+# driver needed for scene routing. If this regresses on a future Maestro
+# version, `adb shell input tap` remains the documented Android fallback
+# per this ticket's scope for the TAP steps themselves (which do not
+# exhibit this issue -- Maestro's tapOn reliably found and tapped
+# touch-target every time once the correct scene was actually showing).
+appId: com.emubench.rig
+---
+- launchApp:
+    clearState: false
+- openLink: "emubench://scene/touch.latency?minSamples=32"
+- openLink: "emubench://scene/touch.latency?minSamples=32"
+- extendedWaitUntil:
+    visible:
+      id: "touch-target"
+    timeout: 10000
+- repeat:
+    times: 32
+    commands:
+      - tapOn:
+          id: "touch-target"
+      - extendedWaitUntil:
+          visible:
+            id: "touch-target"
+          timeout: 1000

@@ -5,6 +5,7 @@
  * acceptance criterion 3), and `startup.tti`. T05 adds the Hermes suite
  * (Group 2) and storage suite (Group 5) -- see PLAN.md §4. T06 adds the
  * rendering suite (Group 3: Skia S1-S4, FlashList scroll, nav transitions).
+ * T07 adds the primary input-latency scene (Group 4: touch.latency).
  */
 
 import { registerScene } from '../harness/sceneRegistry';
@@ -26,6 +27,7 @@ import { SkiaS3TextureChurnScene } from './SkiaS3TextureChurnScene';
 import { SkiaS4VectorTextScene } from './SkiaS4VectorTextScene';
 import { ListScrollScene } from './ListScrollScene';
 import { NavTransitionsScene } from './NavTransitionsScene';
+import { TouchLatencyScene } from './TouchLatencyScene';
 
 registerScene({ id: 'demo.noop', component: DemoNoopScene });
 registerScene({ id: 'demo.framerecorder', component: FrameRecorderDemoScene });
@@ -51,3 +53,6 @@ registerScene({ id: 'skia.s3.texture_churn', component: SkiaS3TextureChurnScene 
 registerScene({ id: 'skia.s4.vector_text', component: SkiaS4VectorTextScene });
 registerScene({ id: 'list.scroll', component: ListScrollScene });
 registerScene({ id: 'nav.transitions', component: NavTransitionsScene });
+
+// Group 4 -- input latency, primary (ticket T07)
+registerScene({ id: 'touch.latency', component: TouchLatencyScene });

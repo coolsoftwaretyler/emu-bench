@@ -21,11 +21,16 @@
  */
 
 import path from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 import { register } from './registry.js';
 import {
+  ANDROID_APP_ID,
+  IOS_BUNDLE_ID,
+  RESULTS_FILENAME,
   awaitAndPullResultsAndroid,
   awaitAndPullResultsIos,
   ensureAdbRoot,
@@ -35,7 +40,9 @@ import {
   launchSceneIos,
 } from './rig-host.js';
 
+const execFileAsync = promisify(execFile);
 const scratchDir = fileURLToPath(new URL('../results/.scratch/', import.meta.url));
+const flowsDir = fileURLToPath(new URL('../flows/', import.meta.url));
 
 /**
  * Runs one rig scene end to end on the given leg and returns its parsed
@@ -100,6 +107,16 @@ const IO_FILES_TIMEOUT_MS = 180_000;
  * @type {number}
  */
 const LIST_SCROLL_TIMEOUT_MS = 120_000;
+/**
+ * Headroom for the Maestro flow's own 32-tap loop (ticket T07): each tap
+ * involves a real UI Automator/XCUITest injection plus an
+ * `extendedWaitUntil` settle, and manual verification measured full
+ * 32-tap runs taking 60-80s end to end (Android ~77s, iOS in the same
+ * range) -- well past DEFAULT_TIMEOUT_MS's 60s once app-launch overhead
+ * is added on top.
+ * @type {number}
+ */
+const TOUCH_LATENCY_TIMEOUT_MS = 180_000;
 
 /**
  * @param {string} sceneId
@@ -132,6 +149,79 @@ async function runRigScene(
     throw new Error(`rig-scenes: scene "${sceneId}" did not yield a numeric samples array`);
   }
   return samples;
+}
+
+/**
+ * Drives `touch.latency` (ticket T07, PLAN.md §4 Group 4, H6) end to end
+ * via the Maestro flow at `flows/touch-latency.yaml`, unlike every other
+ * `runRigScene` caller above: this scene's whole point is that taps are
+ * delivered by an external injection tool (Maestro), not synthesized by
+ * the scene's own JS -- the ticket's "immune to injection-tool
+ * differences" claim depends on the *same* tap-delivery mechanism running
+ * on both legs, not on the host launching the scene and the scene
+ * self-triggering its own state changes the way T05/T06 scenes do.
+ *
+ * The flow itself owns launching the app AND tapping (see that file's own
+ * doc comment for why `openLink` is called twice -- a diagnosed Maestro
+ * routing quirk on this Maestro/Xcode/simulator and Maestro/emulator
+ * combination, confirmed via captured accessibility-hierarchy debug
+ * output, not a timing race); this function's job is only to remove any
+ * stale results file first (same precedent as `launchSceneAndroid`/
+ * `launchSceneIos` in rig-host.js: a caller polling for the file
+ * afterward must not mistake a leftover previous-run result for this
+ * run's output), invoke `maestro test`, then reuse the existing
+ * poll-and-pull helpers to retrieve the scene's own results file.
+ * @param {'b'|'c'} leg
+ * @returns {Promise<any>} the scene's raw `measurement` payload
+ */
+async function runTouchLatencySceneViaMaestro(leg) {
+  const flowPath = path.join(flowsDir, 'touch-latency.yaml');
+  const destPath = path.join(scratchDir, `touch-latency-leg-${leg}.local.json`);
+
+  if (leg === 'b') {
+    const serial = await firstAndroidDeviceSerial();
+    if (!serial) {
+      throw new Error('rig-scenes: no Android device/emulator found for scene "touch.latency"');
+    }
+    await ensureAdbRoot({ serial });
+    // Best-effort stale-results cleanup, matching launchSceneAndroid's own
+    // precedent -- ignores failure (e.g. first-ever run, file doesn't exist).
+    await execFileAsync('adb', [
+      '-s',
+      serial,
+      'shell',
+      'rm',
+      '-f',
+      `/data/data/${ANDROID_APP_ID}/files/${RESULTS_FILENAME}`,
+    ]).catch(() => {});
+    await execFileAsync('maestro', ['--platform', 'android', '--udid', serial, 'test', flowPath], {
+      timeout: TOUCH_LATENCY_TIMEOUT_MS,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    await awaitAndPullResultsAndroid({ serial, destPath, timeoutMs: TOUCH_LATENCY_TIMEOUT_MS });
+  } else {
+    const udid = (await firstBootedSimulatorUdid()) ?? 'booted';
+    try {
+      const { stdout } = await execFileAsync('xcrun', [
+        'simctl',
+        'get_app_container',
+        udid,
+        IOS_BUNDLE_ID,
+        'data',
+      ]);
+      await rm(path.join(stdout.trim(), 'Documents', RESULTS_FILENAME), { force: true });
+    } catch {
+      // App not installed yet, or no prior results file -- fine either way.
+    }
+    await execFileAsync('maestro', ['--platform', 'ios', '--udid', udid, 'test', flowPath], {
+      timeout: TOUCH_LATENCY_TIMEOUT_MS,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    await awaitAndPullResultsIos({ udid, destPath, timeoutMs: TOUCH_LATENCY_TIMEOUT_MS });
+  }
+
+  const json = await readFile(destPath, 'utf8');
+  return JSON.parse(json).measurement;
 }
 
 /**
@@ -405,6 +495,37 @@ export function registerRigSceneBenchmarks() {
     unit: 'ms_per_frame',
     async run(ctx) {
       return runRigScene('nav.transitions', {}, ctx, (m) => m.samples_ms);
+    },
+  });
+
+  // --- Group 4: input latency, primary (PLAN.md §4 Group 4, H6; ticket T07) ---
+  // Unlike every entry above, this scene's `run(ctx)` does not go through
+  // `runRigScene`/`runSceneAndGetMeasurement` -- see
+  // `runTouchLatencySceneViaMaestro`'s own doc comment for why (taps must
+  // be delivered by the same external injector, Maestro, on both legs).
+
+  register({
+    id: 'touch.latency',
+    group: 4,
+    legs: ['b', 'c'],
+    kind: 'micro',
+    unit: 'ms',
+    async run(ctx) {
+      if (ctx.leg !== 'b' && ctx.leg !== 'c') {
+        throw new Error(`rig-scenes: scene "touch.latency" only supports legs b/c, got "${ctx.leg}"`);
+      }
+      const measurement = await runTouchLatencySceneViaMaestro(ctx.leg);
+      const samples = measurement.samples_ms;
+      if (!Array.isArray(samples) || samples.some((s) => typeof s !== 'number')) {
+        throw new Error('rig-scenes: scene "touch.latency" did not yield a numeric samples array');
+      }
+      if (measurement.missedTaps > 0) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `emu-bench: touch.latency leg ${ctx.leg}: ${measurement.notes ?? `${measurement.missedTaps} missed tap(s)`}`,
+        );
+      }
+      return samples;
     },
   });
 }
