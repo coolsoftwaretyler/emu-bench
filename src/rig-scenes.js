@@ -88,6 +88,18 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 const FSYNC_TIMEOUT_MS = 300_000;
 /** Headroom for io.files' 500 MB streamed write+read on top of 1,000 small-file round trips. */
 const IO_FILES_TIMEOUT_MS = 180_000;
+/**
+ * Group 3 (ticket T06) Skia scenes run a fixed in-scene duration (8s
+ * default, DEFAULT_DURATION_MS in the scene components) plus warmup (1s
+ * default) -- comfortably inside DEFAULT_TIMEOUT_MS's 60s. `list.scroll`
+ * defaults to a much longer in-scene duration (60s, per the ticket:
+ * "default 60 s to serve as T12's power scenario") and its own params
+ * below are pinned to that default explicitly, so it needs headroom above
+ * that 60s scene-side duration for build/launch/animation/result-write
+ * overhead on top.
+ * @type {number}
+ */
+const LIST_SCROLL_TIMEOUT_MS = 120_000;
 
 /**
  * @param {string} sceneId
@@ -95,13 +107,26 @@ const IO_FILES_TIMEOUT_MS = 180_000;
  * @param {import('./types.js').RunContext} ctx
  * @param {(measurement: any) => number[]} extractSamples
  * @param {number} [timeoutMs]
+ * @param {(measurement: any) => void} [onMeasurement] optional hook given the
+ *   full raw measurement before sample extraction -- used by `list.scroll`
+ *   below to log its scroll-distance field (ticket T06 acceptance
+ *   criterion: "log total px scrolled; must match") without adding a
+ *   scene-specific return shape to every other caller of this function.
  * @returns {Promise<number[]>}
  */
-async function runRigScene(sceneId, params, ctx, extractSamples, timeoutMs = DEFAULT_TIMEOUT_MS) {
+async function runRigScene(
+  sceneId,
+  params,
+  ctx,
+  extractSamples,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  onMeasurement,
+) {
   if (ctx.leg !== 'b' && ctx.leg !== 'c') {
     throw new Error(`rig-scenes: scene "${sceneId}" only supports legs b/c, got "${ctx.leg}"`);
   }
   const measurement = await runSceneAndGetMeasurement(sceneId, params, ctx.leg, timeoutMs);
+  onMeasurement?.(measurement);
   const samples = extractSamples(measurement);
   if (!Array.isArray(samples) || samples.some((s) => typeof s !== 'number')) {
     throw new Error(`rig-scenes: scene "${sceneId}" did not yield a numeric samples array`);
@@ -287,6 +312,99 @@ export function registerRigSceneBenchmarks() {
         (m) => m.smallFiles.read.samples_ms,
         IO_FILES_TIMEOUT_MS,
       );
+    },
+  });
+
+  // --- Group 3: rendering pipeline suite (PLAN.md §4 Group 3, H4, H5; ticket T06) ---
+  // Every scene's own component picks its default durationMs/warmupMs (see
+  // rig/src/scenes/Skia*.tsx, ListScrollScene.tsx, NavTransitionsScene.tsx)
+  // -- registry entries below pass no params for those, so the scene's own
+  // defaults apply; extractSamples always pulls `samples_ms`, the raw
+  // frame-to-frame intervals the shared FrameRecorder produces (rig/src/
+  // harness/frameRecorder.ts), so the host-side stats pipeline (summarize())
+  // recomputes median/p95/p99/cv over the untouched per-frame samples
+  // rather than trusting the scene's own summary numbers blind -- same
+  // precedent as every Group 2/5 entry above.
+
+  register({
+    id: 'skia.s1.drawcall_storm',
+    group: 3,
+    legs: ['b', 'c'],
+    kind: 'macro',
+    unit: 'ms_per_frame',
+    async run(ctx) {
+      return runRigScene('skia.s1.drawcall_storm', {}, ctx, (m) => m.samples_ms);
+    },
+  });
+
+  register({
+    id: 'skia.s2.fillrate',
+    group: 3,
+    legs: ['b', 'c'],
+    kind: 'macro',
+    unit: 'ms_per_frame',
+    async run(ctx) {
+      return runRigScene('skia.s2.fillrate', {}, ctx, (m) => m.samples_ms);
+    },
+  });
+
+  register({
+    id: 'skia.s3.texture_churn',
+    group: 3,
+    legs: ['b', 'c'],
+    kind: 'macro',
+    unit: 'ms_per_frame',
+    async run(ctx) {
+      return runRigScene('skia.s3.texture_churn', {}, ctx, (m) => m.samples_ms);
+    },
+  });
+
+  register({
+    id: 'skia.s4.vector_text',
+    group: 3,
+    legs: ['b', 'c'],
+    kind: 'macro',
+    unit: 'ms_per_frame',
+    async run(ctx) {
+      return runRigScene('skia.s4.vector_text', {}, ctx, (m) => m.samples_ms);
+    },
+  });
+
+  register({
+    id: 'list.scroll',
+    group: 3,
+    legs: ['b', 'c'],
+    kind: 'macro',
+    unit: 'ms_per_frame',
+    async run(ctx) {
+      // Params pinned explicitly (matching the scene component's own
+      // defaults) so a future change to ListScrollScene.tsx's defaults
+      // can't silently change what a registry run measures without this
+      // call site's LIST_SCROLL_TIMEOUT_MS being revisited too.
+      return runRigScene(
+        'list.scroll',
+        { durationMs: 60_000 },
+        ctx,
+        (m) => m.samples_ms,
+        LIST_SCROLL_TIMEOUT_MS,
+        (m) => {
+          // eslint-disable-next-line no-console
+          console.log(
+            `emu-bench: list.scroll leg ${ctx.leg}: totalScrolledPx=${m.totalScrolledPx} velocityPxPerS=${m.velocityPxPerS}`,
+          );
+        },
+      );
+    },
+  });
+
+  register({
+    id: 'nav.transitions',
+    group: 3,
+    legs: ['b', 'c'],
+    kind: 'macro',
+    unit: 'ms_per_frame',
+    async run(ctx) {
+      return runRigScene('nav.transitions', {}, ctx, (m) => m.samples_ms);
     },
   });
 }

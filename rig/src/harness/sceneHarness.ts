@@ -61,3 +61,32 @@ export function parseDurationMs(params: Record<string, string>, fallbackMs: numb
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackMs;
 }
+
+/**
+ * Parses `warmupMs` from scene params (ticket T06: "warmup period excluded"
+ * on every Group 3 scene), falling back to `fallbackMs` when absent or
+ * unparseable. Unlike `parseDurationMs`, 0 is a valid explicit value (no
+ * warmup), so only a negative or non-finite override falls back.
+ */
+export function parseWarmupMs(params: Record<string, string>, fallbackMs: number): number {
+  const raw = params.warmupMs;
+  if (raw === undefined) return fallbackMs;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallbackMs;
+}
+
+/**
+ * Parses a generic non-negative numeric param, falling back to
+ * `fallbackValue` when absent or unparseable. Shared by T06 scenes for
+ * `seed`, `count`, `velocity`, etc.
+ */
+export function parseNumberParam(
+  params: Record<string, string>,
+  key: string,
+  fallbackValue: number,
+): number {
+  const raw = params[key];
+  if (raw === undefined) return fallbackValue;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallbackValue;
+}
