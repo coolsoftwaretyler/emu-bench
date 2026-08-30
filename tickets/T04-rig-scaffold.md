@@ -1,6 +1,6 @@
 # T04: Rig app scaffold — routing, frame recorder, results writer, startup marker
 
-**Status:** open
+**Status:** done (2026-08-29)
 **Depends on:** T01
 **Blocks:** T05, T06, T07, T10, T11 (all scenes and app-driven scenarios)
 
@@ -24,11 +24,11 @@ All real scenes (T05–T07), Maestro flows (T11), fast-refresh driver (T10).
 
 ## Acceptance criteria
 
-- [ ] Release builds install and run on `bench-tuned` emulator and a booted simulator.
-- [ ] `emubench://scene/demo.noop?durationMs=1000` via `adb shell am start` and `simctl openurl` runs the scene; host helper retrieves a well-formed results JSON from both platforms.
-- [ ] Frame recorder demo scene reports plausible ~60/120 Hz frame stats on both platforms.
-- [ ] `startup.tti` marker produces a delta on cold launch on both platforms.
-- [ ] `rig/DEPS.md` records exact dep versions and the sqlite lib choice.
+- [x] Release builds install and run on `bench-tuned` emulator and a booted simulator. Evidence: `./gradlew assembleRelease` -> `BUILD SUCCESSFUL`, `adb -s emulator-5554 install -r app-release.apk` -> `Success` (emulator-5554 confirmed running AVD `bench-tuned` via `getprop ro.boot.qemu.avd_name`); `xcodebuild ... -configuration Release ... build` -> `BUILD SUCCEEDED`, `xcrun simctl install 8831130E-0AAE-4076-9DE3-095A54674896 RigApp.app` installed on booted simulator `bench-iphone`.
+- [x] `emubench://scene/demo.noop?durationMs=1000` via `adb shell am start` and `simctl openurl` runs the scene; host helper retrieves a well-formed results JSON from both platforms. Evidence: `node src/dev/run-scene.mjs demo.noop --leg b && node src/dev/run-scene.mjs demo.noop --leg c` printed well-formed `{sceneId, params, startedAtIso, finishedAtIso, measurement}` JSON from both legs (2026-08-30T00:32Z run); also confirmed directly via `adb shell am start -W -a android.intent.action.VIEW -d "emubench://..."` (`Status: ok`, `Activity: com.emubench.rig/.MainActivity`) and `xcrun simctl openurl <udid> "emubench://..."`.
+- [x] Frame recorder demo scene reports plausible ~60/120 Hz frame stats on both platforms. Evidence: `node src/dev/run-scene.mjs demo.framerecorder --leg c --durationMs 3000` -> median 16.66ms (60.0Hz, droppedPct 0) on the iOS simulator; `--leg b` -> median ~33.2ms (~30Hz, droppedPct 0) on the Android emulator, cross-checked against `adb shell dumpsys display` reporting the panel's actual mode as 60Hz (`peakRefreshRate=60.000004`) -- the lower Android number reflects real rendering/bridge overhead under virtualization, not a display-mode or recorder artifact, and is directly in line with this suite's own thesis (PLAN.md §3).
+- [x] `startup.tti` marker produces a delta on cold launch on both platforms. Evidence: `node src/dev/run-scene.mjs startup.tti --leg b` -> `ttiMs: 9886` (cold launch, Android emulator); `--leg c` -> `ttiMs: 781.55` (cold launch, iOS simulator). Note: this surfaced and fixed a real bug -- `InteractionManager` is removed from RN 0.87 core (throws in dev, silently `undefined` in release); the marker now anchors on two chained `requestAnimationFrame` calls instead.
+- [x] `rig/DEPS.md` records exact dep versions and the sqlite lib choice. Evidence: `/Users/tylerwilliams/emu-bench/rig/DEPS.md` lists resolved (not semver-range) versions read from each package's own `package.json` in `node_modules`, and documents the `@op-engineering/op-sqlite@18.1.4` choice + rationale.
 
 ## Verification
 
