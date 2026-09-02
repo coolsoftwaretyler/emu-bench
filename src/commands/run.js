@@ -40,6 +40,8 @@ import { registerRefreshBenchmarks } from '../scenarios/refresh.js';
 registerRefreshBenchmarks();
 import { registerTtiBenchmarks } from '../scenarios/tti.js';
 registerTtiBenchmarks();
+import { registerPhotonBenchmarks } from '../photon.js';
+registerPhotonBenchmarks();
 
 const WARMUP_DISCARDS = 2;
 
@@ -122,13 +124,16 @@ export async function runCommand(flags) {
           },
         };
         // An entry may return either a bare samples array or
-        // `{samples, method}` — the object form exists for probes whose
-        // measurement method is only known at runtime and must land in the
-        // results row (T08's fence.roundtrip: which context bootstrap the
-        // probe achieved per leg, or the flagged "skia-fallback").
+        // `{samples, method, captureFps}` — the object form exists for
+        // probes whose measurement method is only known at runtime and
+        // must land in the results row (T08's fence.roundtrip: which
+        // context bootstrap the probe achieved per leg, or the flagged
+        // "skia-fallback"; T09's photon.latency: `method: "scene-flash"`
+        // plus `captureFps: 60` for quantization honesty).
         const ran = await entry.run(ctx);
         const rawSamples = Array.isArray(ran) ? ran : ran.samples;
         const method = Array.isArray(ran) ? undefined : ran.method;
+        const captureFps = Array.isArray(ran) ? undefined : ran.captureFps;
         const { kept, discarded } = discardWarmups(rawSamples, WARMUP_DISCARDS);
         const summary = summarize(kept, discarded);
         benchmarks.push({
@@ -138,6 +143,7 @@ export async function runCommand(flags) {
           config: config === 'both' ? 'tuned' : config,
           unit: entry.unit,
           ...(method !== undefined ? { method } : {}),
+          ...(captureFps !== undefined ? { captureFps } : {}),
           ...summary,
         });
       } catch (/** @type {any} */ err) {

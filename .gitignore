@@ -18,3 +18,5 @@ hello/**/ios/build*/
 # Local scratch, never committed
 *.local.json
 *.local.bin
+*.local.yaml
+*.local.mov

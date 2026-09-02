@@ -110,7 +110,12 @@
           "unit": { "type": "string" },
           "method": {
             "type": "string",
-            "description": "Optional: how this number was measured, for probes whose method is runtime-determined (T08 fence.roundtrip: egl-surfaceless / egl-pbuffer / metal, or skia-fallback per SPEC.md §10). Additive-optional, so files written before this field existed remain valid."
+            "description": "Optional: how this number was measured, for probes whose method is runtime-determined (T08 fence.roundtrip: egl-surfaceless / egl-pbuffer / metal, or skia-fallback per SPEC.md §10; T09 photon.latency: scene-flash). Additive-optional, so files written before this field existed remain valid."
+          },
+          "captureFps": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Optional: recording frame rate for probes whose measurement quantizes to whole video frames (T09 photon.latency: 60 per SPEC.md §10 — quantization honesty: the analyzer's own frame-count values are the primitive measurement, ms is derived). Additive-optional, so files written before this field existed remain valid."
           },
           "n": { "type": "integer", "minimum": 0 },
           "warmupsDiscarded": { "type": "integer", "minimum": 0 },

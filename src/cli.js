@@ -52,7 +52,7 @@ const USAGE = `emu-bench — Android Emulator vs iOS Simulator benchmark suite
 
 Usage:
   emu-bench doctor [--json]
-  emu-bench run [--groups 1-7] [--legs a,b,c] [--config tuned|default|both] [--label NAME] [--endurance] [--allow-battery]
+  emu-bench run [--groups 1-7] [--legs a,b,c] [--config tuned|default|both] [--label NAME] [--endurance] [--allow-battery] [--region x,y,w,h] [--photon-taps N]
   emu-bench aggregate [--out md|csv]
 
 See SPEC.md §5 for full CLI surface.`;
