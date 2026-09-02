@@ -15,10 +15,22 @@ export type SceneDefinition = {
 
 const scenes = new Map<string, SceneDefinition>();
 
+/**
+ * Registers a scene, overwriting any existing registration under the same
+ * id (ticket T10 discovery, `refresh.metro`): React Native's Fast Refresh
+ * re-executes a changed module's entire dependent graph, which includes
+ * every top-level `registerScene(...)` call in `scenes/index.ts` -- so
+ * *any* edit to *any* scene file reachable from that index re-runs every
+ * one of these calls again in the same process. A throw-on-duplicate
+ * registry (the original behavior here) made Fast Refresh crash on its
+ * very first update for any scene, with "sceneRegistry: duplicate scene
+ * id ..." -- confirmed via a real dev-mode edit-and-observe run against
+ * `refresh.marker`. Overwriting is the correct, idempotent behavior for a
+ * registry that must survive repeated re-execution of its own
+ * registration calls; a genuine accidental duplicate id at authoring time
+ * is a code-review concern, not a runtime invariant to enforce here.
+ */
 export function registerScene(definition: SceneDefinition): void {
-  if (scenes.has(definition.id)) {
-    throw new Error(`sceneRegistry: duplicate scene id "${definition.id}"`);
-  }
   scenes.set(definition.id, definition);
 }
 

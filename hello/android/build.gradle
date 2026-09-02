@@ -1,0 +1,27 @@
+// Root build file for the hello-world fixture (ticket T10). Plain Android
+// Gradle plugin only -- no React Native / Hermes / Kotlin needed for a
+// single trivial Activity, kept in vanilla Java to avoid even a Kotlin
+// stdlib dependency inflating the APK relative to what a "hello world"
+// should be.
+buildscript {
+    ext {
+        compileSdkVersion = 36
+        targetSdkVersion = 36
+        minSdkVersion = 24
+        buildToolsVersion = "36.0.0"
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.7.3")
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}

@@ -1,0 +1,10 @@
+// Minimal hello-world fixture (ticket T10 scope: "build a trivial hello
+// app once as a fixture within the repo"). Deliberately NOT wired into
+// rig/android's React Native gradle root -- that root's settings.gradle
+// depends on com.facebook.react.settings and the RN gradle plugin, and the
+// whole point of this fixture is to be a genuinely minimal, non-RN,
+// non-Hermes app so install.hello contrasts with install.rig's much larger
+// (RN + Hermes bytecode + Skia/sqlite native libs) APK -- see
+// hello/README.md for the fixture-vs-second-app-id decision.
+rootProject.name = 'hello'
+include ':app'

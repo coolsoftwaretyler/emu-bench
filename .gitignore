@@ -8,5 +8,13 @@ rig/**/ios/build/
 rig/**/ios/Pods/
 kernels/build/
 
+# hello fixture app build outputs (T10) -- own .gitignore under hello/
+# covers local.properties etc.; these two catch Gradle/xcodebuild output
+# dirs specifically, matching the rig entries above.
+hello/**/android/app/build/
+hello/**/android/.gradle/
+hello/**/ios/build*/
+
 # Local scratch, never committed
 *.local.json
+*.local.bin

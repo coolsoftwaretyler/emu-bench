@@ -1,0 +1,39 @@
+apply plugin: "com.android.application"
+
+android {
+    namespace "com.emubench.hello"
+    compileSdkVersion rootProject.ext.compileSdkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+
+    defaultConfig {
+        applicationId "com.emubench.hello"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        // Overridable via `-PhelloVersionCode=N` so the install scenario
+        // (src/scenarios/install.js) can build a "v2" APK with a bumped
+        // versionCode for the upgrade-install variant (`adb install -r`
+        // over an existing install) without maintaining two separate
+        // Gradle modules for one Activity.
+        versionCode (project.hasProperty('helloVersionCode') ? (project.helloVersionCode as Integer) : 1)
+        versionName (project.hasProperty('helloVersionCode') ? "1.${project.helloVersionCode}" : "1.0")
+    }
+
+    // Debug-signed release build: install.hello measures adb/simctl install
+    // transport cost, not code-signing infrastructure -- same rationale as
+    // the ticket not requiring a distributable app, just an installable
+    // fixture. Matches PLAN.md §5 "release config" for the rig; this app
+    // has no dev/release distinction worth making (no JS bundle, no debug
+    // menu) so a single release-signed build target is enough for both
+    // "fresh" and "upgrade" install variants (T10 scope).
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

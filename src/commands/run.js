@@ -8,7 +8,11 @@
  * longer hardcodes a leg-A-only gate. Full orchestration hygiene
  * (interleaved legs, cooldowns, multi-group scheduling policy) still
  * lands in T13; this command remains the minimal slice that makes the
- * registry -> results pipeline real end to end.
+ * registry -> results pipeline real end to end. T10 added src/scenarios/
+ * (Group 6: boot, install, transfer, refresh, TTI) — host-side scenarios
+ * with no rig-scene involvement (boot/install/transfer), so they follow
+ * the same "own leg mechanics inside run(ctx)" pattern as T03's kernels
+ * and T08's fence probe rather than routing through rig-scenes.js.
  */
 
 import { requireAppleSilicon } from '../arm64-gate.js';
@@ -26,6 +30,16 @@ import { registerRigSceneBenchmarks } from '../rig-scenes.js';
 registerRigSceneBenchmarks();
 import { registerFenceBenchmarks } from '../fence.js';
 registerFenceBenchmarks();
+import { registerBootBenchmarks } from '../scenarios/boot.js';
+registerBootBenchmarks();
+import { registerInstallBenchmarks } from '../scenarios/install.js';
+registerInstallBenchmarks();
+import { registerTransferBenchmarks } from '../scenarios/transfer.js';
+registerTransferBenchmarks();
+import { registerRefreshBenchmarks } from '../scenarios/refresh.js';
+registerRefreshBenchmarks();
+import { registerTtiBenchmarks } from '../scenarios/tti.js';
+registerTtiBenchmarks();
 
 const WARMUP_DISCARDS = 2;
 
