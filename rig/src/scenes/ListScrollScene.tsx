@@ -25,6 +25,21 @@
  * 3s test run) -- close, but not the exact match the criterion asks for.
  * Computing it from params instead makes the two exactly equal by
  * construction, independent of actual frame timing on either platform.
+ *
+ * `mode=manual` (ticket T11, PLAN.md §4 Group 6 E2E row: "scroll a list --
+ * reuse `list.scroll` scene in manual-scroll mode: add a `mode=manual` param
+ * disabling auto-scroll so Maestro swipes"): when this param is present,
+ * the RAF-driven `scrollToOffset` loop above never starts and the list's
+ * own native `scrollEnabled` is left on, so Maestro's `swipe`/`scroll`
+ * gesture commands drive the list exactly the way a user would -- the E2E
+ * flow needs a target it can actually author gestures against, not the
+ * default mode's deterministic, non-interactive auto-scroll (which stays
+ * the default precisely so the *other* scenes/scenarios that reuse this
+ * component -- the frame-time measurement itself, T12's power scenario --
+ * keep their reproducible, driver-independent scroll). `totalScrolledPx`
+ * has no meaning in manual mode (nothing drives a known distance), so it
+ * is reported as `null` rather than the auto-scroll formula's now-untrue
+ * value.
  */
 
 import React, { useEffect, useMemo, useRef } from 'react';
@@ -62,6 +77,10 @@ export function ListScrollScene({ params, finish }: SceneProps) {
   const seed = parseNumberParam(params, 'seed', DEFAULT_SEED);
   const cardCount = parseNumberParam(params, 'cardCount', CARD_COUNT);
   const velocity = parseNumberParam(params, 'velocity', DEFAULT_VELOCITY_PX_PER_S);
+  // T11: `mode=manual` disables the RAF auto-scroll driver below and leaves
+  // native scrolling on, so Maestro's swipe/scroll gestures move the list
+  // instead (see file-level doc).
+  const manualMode = params.mode === 'manual';
   const { width } = useWindowDimensions();
 
   const images = useMemo(() => generateNoiseImages(cardCount, CARD_IMAGE_SIZE_PX, seed), [cardCount, seed]);
@@ -79,23 +98,29 @@ export function ListScrollScene({ params, finish }: SceneProps) {
 
   useEffect(() => {
     const recorder = new FrameRecorder(durationMs, warmupMs);
-    let scrollStart: number | null = null;
 
-    const driveScroll = (now: number) => {
-      if (scrollStart === null) scrollStart = now;
-      const elapsedS = (now - scrollStart) / 1000;
-      const offset = velocity * elapsedS;
-      listRef.current?.scrollToOffset({ offset, animated: false });
+    if (!manualMode) {
+      let scrollStart: number | null = null;
+      const driveScroll = (now: number) => {
+        if (scrollStart === null) scrollStart = now;
+        const elapsedS = (now - scrollStart) / 1000;
+        const offset = velocity * elapsedS;
+        listRef.current?.scrollToOffset({ offset, animated: false });
+        rafRef.current = requestAnimationFrame(driveScroll);
+      };
       rafRef.current = requestAnimationFrame(driveScroll);
-    };
-    rafRef.current = requestAnimationFrame(driveScroll);
+    }
 
     recorder.start().then((stats) => {
       finish({
         ...stats,
         cardCount: data.length,
         velocityPxPerS: velocity,
-        totalScrolledPx: expectedTotalScrolledPx,
+        // Manual mode has no driven distance to report (see file-level
+        // doc) -- null rather than the auto-scroll formula's now-untrue
+        // value.
+        totalScrolledPx: manualMode ? null : expectedTotalScrolledPx,
+        mode: manualMode ? 'manual' : 'auto',
         seed,
       });
     });
@@ -105,16 +130,17 @@ export function ListScrollScene({ params, finish }: SceneProps) {
       recorder.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [durationMs, warmupMs, velocity, data.length, seed]);
+  }, [durationMs, warmupMs, velocity, data.length, seed, manualMode]);
 
   return (
     <View style={styles.container}>
       <FlashList
+        testID="list-scroll-list"
         ref={listRef}
         data={data}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => <Card item={item} width={width} />}
-        scrollEnabled={false}
+        scrollEnabled={manualMode}
       />
     </View>
   );

@@ -20,3 +20,6 @@ hello/**/ios/build*/
 *.local.bin
 *.local.yaml
 *.local.mov
+
+# Per-iteration Maestro debug logs for failed E2E/flake runs (T11)
+results/logs/

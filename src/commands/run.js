@@ -40,13 +40,15 @@ import { registerRefreshBenchmarks } from '../scenarios/refresh.js';
 registerRefreshBenchmarks();
 import { registerTtiBenchmarks } from '../scenarios/tti.js';
 registerTtiBenchmarks();
+import { registerE2eBenchmarks } from '../scenarios/e2e.js';
+registerE2eBenchmarks();
 import { registerPhotonBenchmarks } from '../photon.js';
 registerPhotonBenchmarks();
 
 const WARMUP_DISCARDS = 2;
 
 /**
- * @param {{ groups?: string, legs?: string, config?: string, label?: string, endurance?: boolean, allowBattery?: boolean }} flags
+ * @param {{ groups?: string, legs?: string, config?: string, label?: string, endurance?: boolean, allowBattery?: boolean, flakeRuns?: string|number }} flags
  */
 export async function runCommand(flags) {
   requireAppleSilicon();
@@ -55,6 +57,12 @@ export async function runCommand(flags) {
   const legs = parseLegs(flags.legs);
   const label = flags.label ?? 'unlabeled';
   const config = /** @type {'tuned'|'default'|'both'} */ (flags.config ?? 'tuned');
+  // `--flake-runs N` (ticket T11 acceptance criterion 4: "50-run mode is
+  // behind a flag since it's slow") -- undefined (not defaulted here)
+  // when the flag is omitted, so e2e.flake_rate applies its own modest
+  // default (DEFAULT_FLAKE_RUNS, 10); the full 50-run scope is opt-in
+  // via `--flake-runs 50`.
+  const flakeRuns = flags.flakeRuns !== undefined ? Number(flags.flakeRuns) : undefined;
 
   // --- Power-source check (SPEC.md §5, §12; ticket line 15, 31) ---
   const { powerSource, onBattery } = await getPowerSource();
@@ -116,6 +124,7 @@ export async function runCommand(flags) {
         const ctx = {
           leg,
           config: config === 'both' ? 'tuned' : config,
+          ...(flakeRuns !== undefined ? { flakeRuns } : {}),
           exec: async (cmd, args) => {
             const { execFile } = await import('node:child_process');
             const { promisify } = await import('node:util');

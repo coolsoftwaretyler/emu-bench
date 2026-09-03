@@ -7,7 +7,7 @@
  * rendering suite (Group 3: Skia S1-S4, FlashList scroll, nav transitions).
  * T07 adds the primary input-latency scene (Group 4: touch.latency).
  * T10 adds `refresh.marker` (Group 6, the fast-refresh scenario's marker
- * scene).
+ * scene). T11 adds `form.basic` (Group 6, the Maestro E2E flow's form step).
  */
 
 import { registerScene } from '../harness/sceneRegistry';
@@ -31,6 +31,7 @@ import { ListScrollScene } from './ListScrollScene';
 import { NavTransitionsScene } from './NavTransitionsScene';
 import { TouchLatencyScene } from './TouchLatencyScene';
 import { RefreshMarkerScene } from './RefreshMarkerScene';
+import { FormBasicScene } from './FormBasicScene';
 
 registerScene({ id: 'demo.noop', component: DemoNoopScene });
 registerScene({ id: 'demo.framerecorder', component: FrameRecorderDemoScene });
@@ -62,3 +63,6 @@ registerScene({ id: 'touch.latency', component: TouchLatencyScene });
 
 // Group 6 -- dev loop, refresh.metro's marker scene (ticket T10)
 registerScene({ id: 'refresh.marker', component: RefreshMarkerScene });
+
+// Group 6 -- dev loop, Maestro E2E flow's form step (ticket T11)
+registerScene({ id: 'form.basic', component: FormBasicScene });

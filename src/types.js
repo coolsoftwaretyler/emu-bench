@@ -74,6 +74,10 @@
  * @property {(cmd: string, args: string[]) => Promise<{stdout: string, stderr: string}>} exec
  *   Runs a command appropriate to this leg (leg A: local shell; leg B: adb
  *   shell; leg C: simctl spawn — wired up as those legs are implemented).
+ * @property {number} [flakeRuns] `--flake-runs N` CLI override (T11,
+ *   src/scenarios/e2e.js's `e2e.flake_rate`: "50-run mode is behind a flag
+ *   since it's slow" — a run without the flag uses that entry's own
+ *   default rather than this field being required).
  */
 
 /**
