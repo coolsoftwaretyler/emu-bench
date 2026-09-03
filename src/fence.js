@@ -206,6 +206,12 @@ export function registerFenceBenchmarks() {
     legs: ['a', 'b', 'c'],
     kind: 'micro',
     unit: 'us_per_roundtrip',
+    // GPU-heavy (PLAN.md §5/§4 Group 4: "submits trivial GPU work and
+    // blocks until it's confirmed done, over and over" -- 1,000+ rounds
+    // of real GPU work per invocation) -- T13 orchestrator inserts a
+    // cooldown after, on every leg (the host-thermal concern PLAN.md §5's
+    // cooldown rule addresses applies regardless of which leg drove it).
+    gpuHeavy: true,
     async run(ctx) {
       const runner = LEG_RUNNERS[ctx.leg];
       if (!runner) {

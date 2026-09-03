@@ -422,6 +422,9 @@ export function registerRigSceneBenchmarks() {
     legs: ['b', 'c'],
     kind: 'macro',
     unit: 'ms_per_frame',
+    // GPU-heavy (PLAN.md §5 cooldown rule; §4 Group 3: gfxstream command
+    // serialization stress) -- T13 orchestrator inserts a cooldown after.
+    gpuHeavy: true,
     async run(ctx) {
       return runRigScene('skia.s1.drawcall_storm', {}, ctx, (m) => m.samples_ms);
     },
@@ -433,6 +436,9 @@ export function registerRigSceneBenchmarks() {
     legs: ['b', 'c'],
     kind: 'macro',
     unit: 'ms_per_frame',
+    // GPU-heavy (PLAN.md §5/§4 Group 3: "maximal pixel work" against the
+    // raw GPU) -- T13 orchestrator inserts a cooldown after.
+    gpuHeavy: true,
     async run(ctx) {
       return runRigScene('skia.s2.fillrate', {}, ctx, (m) => m.samples_ms);
     },
@@ -444,6 +450,9 @@ export function registerRigSceneBenchmarks() {
     legs: ['b', 'c'],
     kind: 'macro',
     unit: 'ms_per_frame',
+    // GPU-heavy (PLAN.md §5/§4 Group 3: constant texture upload/copy
+    // path) -- T13 orchestrator inserts a cooldown after.
+    gpuHeavy: true,
     async run(ctx) {
       return runRigScene('skia.s3.texture_churn', {}, ctx, (m) => m.samples_ms);
     },
@@ -455,6 +464,9 @@ export function registerRigSceneBenchmarks() {
     legs: ['b', 'c'],
     kind: 'macro',
     unit: 'ms_per_frame',
+    // GPU-heavy (PLAN.md §5/§4 Group 3: Skia raster/upload mix) -- T13
+    // orchestrator inserts a cooldown after.
+    gpuHeavy: true,
     async run(ctx) {
       return runRigScene('skia.s4.vector_text', {}, ctx, (m) => m.samples_ms);
     },
@@ -466,6 +478,9 @@ export function registerRigSceneBenchmarks() {
     legs: ['b', 'c'],
     kind: 'macro',
     unit: 'ms_per_frame',
+    // GPU-heavy (PLAN.md §5/§4 Group 3: FlashList scroll drives sustained
+    // GPU frame compositing) -- T13 orchestrator inserts a cooldown after.
+    gpuHeavy: true,
     async run(ctx) {
       // Params pinned explicitly (matching the scene component's own
       // defaults) so a future change to ListScrollScene.tsx's defaults
@@ -493,6 +508,9 @@ export function registerRigSceneBenchmarks() {
     legs: ['b', 'c'],
     kind: 'macro',
     unit: 'ms_per_frame',
+    // GPU-heavy (PLAN.md §5/§4 Group 3: screen push/pop transition
+    // rendering) -- T13 orchestrator inserts a cooldown after.
+    gpuHeavy: true,
     async run(ctx) {
       return runRigScene('nav.transitions', {}, ctx, (m) => m.samples_ms);
     },
@@ -510,6 +528,10 @@ export function registerRigSceneBenchmarks() {
     legs: ['b', 'c'],
     kind: 'micro',
     unit: 'ms',
+    // GPU-heavy (PLAN.md §5/§4 Group 4: "next presented frame after the
+    // resulting state change commits" -- every tap drives a real GPU
+    // frame) -- T13 orchestrator inserts a cooldown after.
+    gpuHeavy: true,
     async run(ctx) {
       if (ctx.leg !== 'b' && ctx.leg !== 'c') {
         throw new Error(`rig-scenes: scene "touch.latency" only supports legs b/c, got "${ctx.leg}"`);

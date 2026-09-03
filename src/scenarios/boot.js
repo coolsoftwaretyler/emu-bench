@@ -52,9 +52,27 @@ const execFileAsync = promisify(execFile);
 
 /** Same single-emulator-instance convention as src/kernels.js/src/fence.js. */
 const EMULATOR_SERIAL = 'emulator-5554';
-/** Bench AVD used for every boot scenario (SPEC.md §6: the tuned AVD is
- * primary for the full matrix). */
-const AVD_NAME = 'bench-tuned';
+/** Bench AVD used for every boot scenario absent an explicit config
+ * override (SPEC.md §6: the tuned AVD is primary for the full matrix). T13
+ * threads `ctx.config` through so the headline-subset-on-default policy
+ * (SPEC.md §5 `run`, PLAN.md §5 "Config policy") can point boot.cold/
+ * boot.warm at `bench-default` for that re-run without duplicating this
+ * module. */
+const TUNED_AVD_NAME = 'bench-tuned';
+const DEFAULT_AVD_NAME = 'bench-default';
+
+/**
+ * Resolves a `'tuned'|'default'|null|undefined` config value (RunContext's
+ * `config` field, T01 src/types.js) to a concrete AVD name. `null`/
+ * `undefined`/anything else defaults to tuned -- the SPEC.md §6 "tuned AVD
+ * is primary" default -- so every pre-T13 call site that never passed a
+ * config keeps booting exactly what it always booted.
+ * @param {string|null|undefined} config
+ * @returns {string}
+ */
+function avdNameForConfig(config) {
+  return config === 'default' ? DEFAULT_AVD_NAME : TUNED_AVD_NAME;
+}
 
 const BOOT_POLL_INTERVAL_MS = 500;
 /** Generous headroom above a true cold boot (observed emulator cold boots
@@ -63,10 +81,17 @@ const BOOT_POLL_INTERVAL_MS = 500;
 const COLD_BOOT_TIMEOUT_MS = 180_000;
 const WARM_BOOT_TIMEOUT_MS = 120_000;
 
-/** Ticket scope: "n>=10 unless noted" (PLAN.md §5 macro floor). */
-const COLD_BOOT_N = 10;
-const WARM_BOOT_N = 10;
-const QUICKBOOT_RELIABILITY_N = 10;
+/** Ticket scope: "n>=10 unless noted" (PLAN.md §5 macro floor). Set to
+ * floor+2 (12), not a bare 10 -- T13's orchestrator applies PLAN.md §5's
+ * "discard 2 warmups" rule uniformly across every registered entry
+ * (SPEC.md §12: warmup discards are orchestrator behavior, not something
+ * each entry opts into), so an entry sized at exactly the floor would
+ * report n=8 after discarding, silently falling below the floor it was
+ * named for. Discovered as a real T13 integration bug during this
+ * ticket's own rehearsal run: boot.cold/boot.warm came back n=8. */
+const COLD_BOOT_N = 12;
+const WARM_BOOT_N = 12;
+const QUICKBOOT_RELIABILITY_N = 12;
 
 /**
  * A resume is classified "genuine" if it completes well under the elapsed
@@ -133,14 +158,17 @@ async function resolveIosUdid() {
  * kills the process it spawns; see shutdownAndroid().
  * @param {string[]} extraFlags
  * @param {number} timeoutMs
+ * @param {string} [avdName] defaults to the tuned AVD (SPEC.md §6 "tuned
+ *   AVD is primary") -- pass DEFAULT_AVD_NAME for the headline-subset
+ *   default-config re-run (PLAN.md §5 "Config policy").
  * @returns {Promise<{ elapsedMs: number, stderr: string }>}
  */
-function bootAndroidOnce(extraFlags, timeoutMs) {
+function bootAndroidOnce(extraFlags, timeoutMs, avdName = TUNED_AVD_NAME) {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     const child = spawn(
       'emulator',
-      ['-avd', AVD_NAME, '-no-window', '-no-audio', ...extraFlags],
+      ['-avd', avdName, '-no-window', '-no-audio', ...extraFlags],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
     let stderrBuf = '';
@@ -202,35 +230,69 @@ function bootAndroidOnce(extraFlags, timeoutMs) {
 }
 
 /**
- * Ensures `emulator-5554` is present in `adb devices`, booting
- * `bench-tuned` (ordinary quickboot-eligible boot, not forced cold) if
- * it isn't -- discovered as a real gap during this ticket's own
- * verification: `boot.cold`/`boot.warm`/`boot.quickboot_reliability` all
- * legitimately end with the emulator shut down (that is what "full
- * shutdown between iterations" means), but nothing else in a single
- * `--groups 6` invocation ever booted it back up again before
- * install/transfer/refresh/tti scenarios ran, so those scenarios found no
- * emulator device at all. Every other Group 6 scenario module
- * (install.js, transfer.js, refresh.js, tti.js) calls this before
- * resolving an Android device serial, so `--groups 6` succeeds
- * end-to-end regardless of execution order within the group.
+ * Reads back which AVD the currently-running `emulator-5554` instance was
+ * launched from (`adb emu avd name`), or `null` if no emulator is up /
+ * the query fails for any reason. Never throws -- an inconclusive answer
+ * is treated the same as "don't know," which `ensureEmulatorRunning`
+ * below handles by rebooting to be sure rather than guessing.
+ * @returns {Promise<string|null>}
+ */
+async function getRunningAvdName() {
+  try {
+    const { stdout } = await execFileAsync('adb', ['-s', EMULATOR_SERIAL, 'emu', 'avd', 'name']);
+    // Output is the AVD name followed by a trailing "OK" status line.
+    const name = stdout.split('\n')[0]?.trim();
+    return name || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ensures `emulator-5554` is present in `adb devices` **and running the
+ * requested AVD** (ordinary quickboot-eligible boot, not forced cold),
+ * booting it if it isn't up at all, or switching (graceful shutdown then
+ * boot the right one) if the wrong AVD is currently running -- discovered
+ * as a real gap during this ticket's own verification: `boot.cold`/
+ * `boot.warm`/`boot.quickboot_reliability` all legitimately end with the
+ * emulator shut down (that is what "full shutdown between iterations"
+ * means), but nothing else in a single `--groups 6` invocation ever
+ * booted it back up again before install/transfer/refresh/tti scenarios
+ * ran, so those scenarios found no emulator device at all. Every other
+ * Group 6 scenario module (install.js, transfer.js, refresh.js, tti.js,
+ * e2e.js) calls this before resolving an Android device serial, so
+ * `--groups 6` succeeds end-to-end regardless of execution order within
+ * the group.
+ *
+ * T13 extends this with the AVD-switch check: the orchestrator's matrix
+ * policy (SPEC.md §5 `run`, PLAN.md §5 "Config policy") runs the full
+ * matrix on `bench-tuned` and then the headline subset on `bench-default`
+ * within the *same* `run` invocation, so a device left running from the
+ * tuned block must be recognized as the wrong AVD and swapped rather than
+ * silently reused for default-config benchmarks (which would silently
+ * re-measure tuned and call it default).
  *
  * Gotcha for future callers that need a *live* Metro connection (this
  * function's own boot does not set one up): a fresh emulator process --
- * which is what this function produces when the emulator was down --
- * carries no `adb reverse` port mappings even though it keeps the same
- * serial; those mappings are per-adb-connection-to-that-process and do
- * not survive a shutdown+reboot cycle. src/scenarios/refresh.js hit this
- * directly (its debug build's very first Metro bundle fetch silently
- * had no path to the dev server) and re-establishes
+ * which is what this function produces when the emulator was down or the
+ * wrong AVD was up -- carries no `adb reverse` port mappings even though
+ * it keeps the same serial; those mappings are per-adb-connection-to-that-
+ * process and do not survive a shutdown+reboot cycle. src/scenarios/
+ * refresh.js hit this directly (its debug build's very first Metro
+ * bundle fetch silently had no path to the dev server) and re-establishes
  * `adb reverse tcp:8081 tcp:8081` itself right after installing its
  * debug build. Any scenario relying on a running Metro instance at
  * runtime (not just at build/bundle time) needs to do the same rather
  * than assuming a mapping set up once at the start of a `run` survives
- * every boot scenario that runs before it.
+ * every boot scenario (or AVD switch) that runs before it.
+ * @param {string|null} [config] `'tuned'|'default'|null|undefined` --
+ *   resolved via avdNameForConfig; omit (or pass a RunContext's bare
+ *   `config` field) to keep booting the tuned AVD, matching every call
+ *   site's pre-T13 behavior.
  * @returns {Promise<void>}
  */
-export async function ensureEmulatorRunning() {
+export async function ensureEmulatorRunning(config) {
+  const wantedAvd = avdNameForConfig(config);
   const { stdout } = await execFileAsync('adb', ['devices']);
   const alreadyUp = stdout
     .split('\n')
@@ -239,8 +301,41 @@ export async function ensureEmulatorRunning() {
       const [serial, state] = line.trim().split(/\s+/);
       return serial?.startsWith('emulator-') && state === 'device';
     });
-  if (alreadyUp) return;
-  await bootAndroidOnce(['-no-boot-anim'], WARM_BOOT_TIMEOUT_MS);
+  if (alreadyUp) {
+    const runningAvd = await getRunningAvdName();
+    if (runningAvd === wantedAvd) return;
+    // Wrong AVD (or inconclusive) is up -- switch: graceful shutdown (so
+    // whatever quickboot state it had gets a normal auto-save on exit,
+    // matching shutdownAndroid()'s own contract) then boot the one we
+    // actually want.
+    await shutdownAndroid();
+  }
+  await bootAndroidOnce(['-no-boot-anim'], WARM_BOOT_TIMEOUT_MS, wantedAvd);
+}
+
+/**
+ * Leg C's counterpart to ensureEmulatorRunning(): every Group 1-5 leg-C
+ * BenchmarkEntry (kernels, rig scenes, fence, photon) assumes a simulator
+ * is already booted (`firstBootedSimulatorUdid() ?? 'booted'`), the same
+ * gap ensureEmulatorRunning fixes for leg B -- discovered during this
+ * ticket's (T13) own orchestrator implementation: nothing outside
+ * boot.cold/boot.warm's own measured boot cycles ever called `simctl
+ * boot` at all, so a `run` starting from a fully-shutdown simulator (e.g.
+ * right after a fresh `doctor` on a clean machine) would fail every
+ * leg-c entry in every other group. No-ops if a simulator is already
+ * booted (SPEC.md §6: the simulator has no tuned/default distinction, so
+ * unlike ensureEmulatorRunning there is no "wrong config" case to detect
+ * and switch away from -- whatever's booted is booted).
+ * @returns {Promise<void>}
+ */
+export async function ensureSimulatorBooted() {
+  const alreadyBooted = await firstBootedSimulatorUdid();
+  if (alreadyBooted) return;
+  const udid = await resolveIosUdid();
+  await execFileAsync('xcrun', ['simctl', 'boot', udid]);
+  await execFileAsync('xcrun', ['simctl', 'bootstatus', udid, '-b'], {
+    timeout: COLD_BOOT_TIMEOUT_MS,
+  });
 }
 
 /**
@@ -268,13 +363,15 @@ async function shutdownAndroid() {
 
 /**
  * Full shutdown -> forced cold boot -> measure elapsed-to-interactive.
+ * @param {string} [avdName] defaults to the tuned AVD; see bootAndroidOnce.
  * @returns {Promise<number>} elapsed ms
  */
-async function coldBootAndroidOnce() {
+async function coldBootAndroidOnce(avdName = TUNED_AVD_NAME) {
   await shutdownAndroid();
   const { elapsedMs } = await bootAndroidOnce(
     ['-no-snapshot-load', '-no-boot-anim'],
     COLD_BOOT_TIMEOUT_MS,
+    avdName,
   );
   return elapsedMs;
 }
@@ -299,10 +396,11 @@ async function coldBootIosOnce(udid) {
  * Classifies one quickboot cycle: boots without `-no-snapshot-load` (so it
  * attempts a resume if a snapshot exists), measures elapsed time, and
  * checks the process's own log output for an explicit fallback signal.
+ * @param {string} [avdName] defaults to the tuned AVD; see bootAndroidOnce.
  * @returns {Promise<{ elapsedMs: number, genuine: boolean, sawFallbackLog: boolean }>}
  */
-async function quickbootCycleOnce() {
-  const { elapsedMs, stderr } = await bootAndroidOnce(['-no-boot-anim'], WARM_BOOT_TIMEOUT_MS);
+async function quickbootCycleOnce(avdName = TUNED_AVD_NAME) {
+  const { elapsedMs, stderr } = await bootAndroidOnce(['-no-boot-anim'], WARM_BOOT_TIMEOUT_MS, avdName);
   const sawFallbackLog = COLD_FALLBACK_LOG_PATTERNS.some((re) => re.test(stderr));
   const genuine = !sawFallbackLog && elapsedMs < QUICKBOOT_GENUINE_THRESHOLD_MS;
   await shutdownAndroid();
@@ -324,13 +422,18 @@ async function quickbootCycleOnce() {
  * `samples`/counts, poisoning every run's data with a harness-
  * manufactured failure PLAN.md's "natural silent-fallback rate" metric
  * was never meant to include).
+ * @param {string} [avdName] defaults to the tuned AVD -- `boot.quickboot_reliability`
+ *   only supports leg b and is not part of the headline subset (SPEC.md
+ *   §5/PLAN.md §5's "cold boot, list.scroll p95, sqlite.insert_fsync, rig
+ *   install"), so its callers never pass anything else, but the parameter
+ *   is threaded for consistency with the other boot-cycle helpers above.
  * @returns {Promise<void>}
  */
-async function wipeQuickbootSnapshot() {
+async function wipeQuickbootSnapshot(avdName = TUNED_AVD_NAME) {
   const home = process.env.HOME ?? '';
   const { rm } = await import('node:fs/promises');
   const path = await import('node:path');
-  const snapshotDir = path.join(home, '.android', 'avd', `${AVD_NAME}.avd`, 'snapshots', 'default_boot');
+  const snapshotDir = path.join(home, '.android', 'avd', `${avdName}.avd`, 'snapshots', 'default_boot');
   await rm(snapshotDir, { recursive: true, force: true });
 }
 
@@ -353,10 +456,15 @@ export function registerBootBenchmarks() {
     unit: 's',
     async run(ctx) {
       if (ctx.leg === 'b') {
+        // Headline subset (SPEC.md §5, PLAN.md §5 "Config policy"):
+        // boot.cold is re-run on bench-default for the tuned-vs-default
+        // delta, so which AVD gets cold-booted here must follow
+        // ctx.config rather than always being the tuned one.
+        const avdName = avdNameForConfig(ctx.config);
         /** @type {number[]} */
         const samples = [];
         for (let i = 0; i < COLD_BOOT_N; i++) {
-          const elapsedMs = await coldBootAndroidOnce();
+          const elapsedMs = await coldBootAndroidOnce(avdName);
           samples.push(elapsedMs / 1000);
         }
         await shutdownAndroid();
@@ -386,9 +494,10 @@ export function registerBootBenchmarks() {
     unit: 's',
     async run(ctx) {
       if (ctx.leg === 'b') {
+        const avdName = avdNameForConfig(ctx.config);
         // First establish a snapshot to resume from: one full cold boot,
         // then a graceful shutdown (which auto-saves quickboot state).
-        await coldBootAndroidOnce();
+        await coldBootAndroidOnce(avdName);
         await shutdownAndroid();
 
         /** @type {number[]} */
@@ -396,7 +505,7 @@ export function registerBootBenchmarks() {
         for (let i = 0; i < WARM_BOOT_N; i++) {
           // No -no-snapshot-* flags: default behavior auto-loads the
           // snapshot if present (SPEC.md §11 "warm (quickboot resume)").
-          const { elapsedMs } = await bootAndroidOnce(['-no-boot-anim'], WARM_BOOT_TIMEOUT_MS);
+          const { elapsedMs } = await bootAndroidOnce(['-no-boot-anim'], WARM_BOOT_TIMEOUT_MS, avdName);
           samples.push(elapsedMs / 1000);
           await shutdownAndroid();
         }
@@ -498,4 +607,11 @@ export {
   wipeQuickbootSnapshot,
   COLD_FALLBACK_LOG_PATTERNS,
   QUICKBOOT_GENUINE_THRESHOLD_MS,
+  // T13 orchestrator device-lifecycle exports: the run orchestrator (and
+  // any leg-b scenario module resolving a device serial) needs to name
+  // the config-appropriate AVD and read back what's actually running.
+  avdNameForConfig,
+  getRunningAvdName,
+  TUNED_AVD_NAME,
+  DEFAULT_AVD_NAME,
 };

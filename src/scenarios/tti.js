@@ -47,8 +47,12 @@ const execFileAsync = promisify(execFile);
 
 const scratchDir = fileURLToPath(new URL('../../results/.scratch/', import.meta.url));
 
-/** Ticket scope: "n>=10" (PLAN.md §5 macro floor). */
-const TTI_N = 10;
+/** Ticket scope: "n>=10" (PLAN.md §5 macro floor). Floor+2 (12), not a
+ * bare 10 -- T13's orchestrator discards 2 warmup samples uniformly
+ * (PLAN.md §5, SPEC.md §12), so an entry sized at exactly the floor would
+ * report n=8 after discarding. Discovered as a real T13 integration bug
+ * during this ticket's own rehearsal run. */
+const TTI_N = 12;
 const EXTRACTION_TIMEOUT_MS = 30_000;
 
 /**
@@ -62,10 +66,13 @@ const EXTRACTION_TIMEOUT_MS = 30_000;
  * emulator off -- that's what "full shutdown between iterations" means),
  * `firstAndroidDeviceSerial()`'s `?? serials[0]` fallback would silently
  * target the physical phone instead of failing loudly.
+ * @param {string|null} [config] RunContext's `config` field (T13: threaded
+ *   through to ensureEmulatorRunning so startup.tti boots the
+ *   config-appropriate AVD rather than always the tuned one).
  * @returns {Promise<string>}
  */
-async function resolveEmulatorSerial() {
-  await ensureEmulatorRunning();
+async function resolveEmulatorSerial(config) {
+  await ensureEmulatorRunning(config);
   const serial = await firstAndroidDeviceSerial();
   if (serial && serial.startsWith('emulator-')) return serial;
   throw new Error(
@@ -151,7 +158,7 @@ export function registerTtiBenchmarks() {
     unit: 'ms',
     async run(ctx) {
       if (ctx.leg === 'b') {
-        const serial = await resolveEmulatorSerial();
+        const serial = await resolveEmulatorSerial(ctx.config);
         await ensureAdbRoot({ serial });
         /** @type {number[]} */
         const samples = [];

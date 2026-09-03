@@ -958,6 +958,10 @@ export function registerPhotonBenchmarks() {
     legs: ['b', 'c'],
     kind: 'micro',
     unit: 'ms',
+    // GPU-heavy (PLAN.md §5/§4 Group 4: screen-recorded tap-to-pixel-change
+    // -- every tap drives a real presented frame, recorded at 60fps for
+    // n>=30 taps) -- T13 orchestrator inserts a cooldown after.
+    gpuHeavy: true,
     async run(ctx) {
       if (ctx.leg !== 'b' && ctx.leg !== 'c') {
         throw new Error(`photon: leg "${ctx.leg}" not supported (no leg-A analog, SPEC.md §10)`);

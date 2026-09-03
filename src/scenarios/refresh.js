@@ -135,10 +135,13 @@ const POLL_INTERVAL_MS = 100;
  * emulator off -- that's what "full shutdown between iterations" means),
  * `firstAndroidDeviceSerial()`'s `?? serials[0]` fallback would silently
  * target the physical phone instead of failing loudly.
+ * @param {string|null} [config] RunContext's `config` field (T13: threaded
+ *   through to ensureEmulatorRunning so refresh.metro boots the
+ *   config-appropriate AVD rather than always the tuned one).
  * @returns {Promise<string>}
  */
-async function resolveEmulatorSerial() {
-  await ensureEmulatorRunning();
+async function resolveEmulatorSerial(config) {
+  await ensureEmulatorRunning(config);
   const serial = await firstAndroidDeviceSerial();
   if (!serial || !serial.startsWith('emulator-')) {
     throw new Error(
@@ -399,16 +402,19 @@ const SEED_MAX_ATTEMPTS = 3;
  * fails, still distinguishing "the mechanism is broken" from ordinary
  * mid-loop flakiness.
  * @param {'b'|'c'} leg
+ * @param {string|null} [config] RunContext's `config` field (T13: threaded
+ *   through to resolveEmulatorSerial so seeding boots the
+ *   config-appropriate AVD rather than always the tuned one).
  * @returns {Promise<void>}
  */
-async function seedRefreshMarkerScene(leg) {
+async function seedRefreshMarkerScene(leg, config) {
   const url = buildSceneUrl('refresh.marker', {});
   /** @type {unknown} */
   let lastErr;
   for (let attempt = 1; attempt <= SEED_MAX_ATTEMPTS; attempt++) {
     try {
       if (leg === 'b') {
-        const serial = await resolveEmulatorSerial();
+        const serial = await resolveEmulatorSerial(config);
         // Set-then-verify, not just set: a real run during this ticket's
         // implementation found `adb reverse tcp:8081 tcp:8081` return
         // success yet the mapping still be absent (or gone again) by the
@@ -494,13 +500,13 @@ export function registerRefreshBenchmarks() {
       // another Group 6 entry left installed, then seed+warm the scene
       // once before timing anything.
       if (ctx.leg === 'b') {
-        const serial = await resolveEmulatorSerial();
+        const serial = await resolveEmulatorSerial(ctx.config);
         await buildAndInstallDebugAndroid(serial);
       } else {
         const udid = (await firstBootedSimulatorUdid()) ?? 'booted';
         await buildAndInstallDebugIos(udid);
       }
-      await seedRefreshMarkerScene(ctx.leg);
+      await seedRefreshMarkerScene(ctx.leg, ctx.config);
 
       // Read-once-restore-once: capture the pristine file content before
       // any mutation so the finally block below can put it back exactly,
@@ -522,7 +528,7 @@ export function registerRefreshBenchmarks() {
           const elapsedMs =
             ctx.leg === 'b'
               ? await awaitMarkerFileAndroid(
-                  await resolveEmulatorSerial(),
+                  await resolveEmulatorSerial(ctx.config),
                   value,
                   writtenAtMs,
                   REFRESH_TIMEOUT_MS,

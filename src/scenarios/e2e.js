@@ -72,14 +72,21 @@ const flowPath = path.join(repoRoot, 'flows/e2e.yaml');
 const logsDir = path.join(repoRoot, 'results/logs/');
 
 /** Ticket scope: "n>=10 timed executions per platform" (PLAN.md §5 macro floor). */
-const DURATION_N = 10;
+// Floor+2 (12), not a bare 10 -- T13's orchestrator discards 2 warmup
+// samples uniformly (PLAN.md §5, SPEC.md §12), so an entry sized at
+// exactly the floor would report n=8 after discarding. Discovered as a
+// real T13 integration bug during this ticket's own rehearsal run.
+const DURATION_N = 12;
 /** Modest no-flag default (matches the ticket's own verification command,
  * `--flake-runs 10`) -- the full "50 executions per platform" scope (PLAN.md
  * §4 / SPEC.md §11) is deliberately opt-in via `--flake-runs 50` (ticket
  * acceptance criterion 4: "50-run mode is behind a flag ... since it's
  * slow"), not the value a plain `--groups 6` pays for automatically. See
- * ctx.flakeRuns below. */
-const DEFAULT_FLAKE_RUNS = 10;
+ * ctx.flakeRuns below. Floor+2 (12), not a bare 10, for the same
+ * warmup-discard headroom reason as DURATION_N above -- an explicit
+ * `--flake-runs 50` override already has ample headroom and is left
+ * untouched (a user-supplied n is never silently altered). */
+const DEFAULT_FLAKE_RUNS = 12;
 /** Generous headroom above this flow's observed ~10-20s real duration on
  * this machine (manual runs during this ticket's implementation) --
  * matches every other Group 6 scenario's "generous, not tuned to the
@@ -95,10 +102,13 @@ const MAESTRO_TIMEOUT_MS = 120_000;
  * T10's own verification, that a physical Pixel 6a attached over adb-tls
  * could otherwise be silently targeted once a preceding boot scenario left
  * the emulator down.
+ * @param {string|null} [config] RunContext's `config` field (T13: threaded
+ *   through to ensureEmulatorRunning so e2e boots the config-appropriate
+ *   AVD rather than always the tuned one).
  * @returns {Promise<string>}
  */
-async function resolveEmulatorSerial() {
-  await ensureEmulatorRunning();
+async function resolveEmulatorSerial(config) {
+  await ensureEmulatorRunning(config);
   const serial = await firstAndroidDeviceSerial();
   if (serial && serial.startsWith('emulator-')) return serial;
   throw new Error(
@@ -186,7 +196,7 @@ export function registerE2eBenchmarks() {
       if (ctx.leg !== 'b' && ctx.leg !== 'c') {
         throw new Error(`e2e.duration: unsupported leg "${ctx.leg}"`);
       }
-      const serial = ctx.leg === 'b' ? await resolveEmulatorSerial() : undefined;
+      const serial = ctx.leg === 'b' ? await resolveEmulatorSerial(ctx.config) : undefined;
       const udid = ctx.leg === 'c' ? ((await firstBootedSimulatorUdid()) ?? 'booted') : undefined;
 
       /** @type {number[]} */
@@ -240,7 +250,7 @@ export function registerE2eBenchmarks() {
       // explicitly passing `--flake-runs 50`.
       const n = ctx.flakeRuns ?? DEFAULT_FLAKE_RUNS;
 
-      const serial = ctx.leg === 'b' ? await resolveEmulatorSerial() : undefined;
+      const serial = ctx.leg === 'b' ? await resolveEmulatorSerial(ctx.config) : undefined;
       const udid = ctx.leg === 'c' ? ((await firstBootedSimulatorUdid()) ?? 'booted') : undefined;
 
       /** @type {number[]} */

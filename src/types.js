@@ -55,6 +55,10 @@
  * @property {number} p95
  * @property {number} p99
  * @property {number} cv
+ * @property {boolean} [cvFlagged] true when `cv > 0.10` (PLAN.md §5 "flag
+ *   CV > 10% as unstable"; SPEC.md §12 "CV flags"). Additive-optional, so
+ *   files written before this field existed remain valid (matches
+ *   method/captureFps's own precedent).
  */
 
 /**
@@ -89,6 +93,18 @@
  * @property {string[]} legs supported leg letters, e.g. ["a"]
  * @property {'micro'|'macro'} kind micro: n>=30, macro: n>=10 (PLAN.md §5)
  * @property {string} unit
+ * @property {boolean} [gpuHeavy] T13 orchestrator hygiene (PLAN.md §5
+ *   "2-min cooldown after GPU-heavy scenes"; SPEC.md §12 "cooldown timers
+ *   are orchestrator behavior, not instructions in a README"): flags a
+ *   scene that exercises gfxstream/the GPU compositor (Group 3 rendering
+ *   scenes, plus the fence probe and photon/touch-latency scenes that
+ *   also drive a GPU frame) so the run orchestrator inserts a cooldown
+ *   timer immediately after it runs. Omitted (falsy) means no cooldown.
+ * @property {number} [durationEstimateS] rough single-invocation wall-time
+ *   estimate in seconds, used only for the orchestrator's up-front runtime
+ *   estimate print (ticket T13 scope: "so a runner knows what they're
+ *   committing to") — never affects execution or results. Omitted entries
+ *   fall back to a coarse per-kind default in the estimator.
  * @property {(ctx: RunContext) => Promise<number[] | {samples: number[], method?: string, captureFps?: number}>} run
  *   returns raw samples — either a bare array, or `{samples, method,
  *   captureFps}` when the probe's measurement method is runtime-determined

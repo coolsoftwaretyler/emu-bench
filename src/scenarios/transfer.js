@@ -38,8 +38,12 @@ const DEVICE_PUSH_PATH = '/data/local/tmp/embench-transfer-blob';
 
 /** PLAN.md §4 Group 6 / Appendix Phase-0 command: "500 MB". */
 const BLOB_BYTES = 500 * 1024 * 1024;
-/** Ticket scope: "n>=10 unless noted" (PLAN.md §5 macro floor). */
-const TRANSFER_N = 10;
+/** Ticket scope: "n>=10 unless noted" (PLAN.md §5 macro floor). Floor+2
+ * (12), not a bare 10 -- T13's orchestrator discards 2 warmup samples
+ * uniformly (PLAN.md §5, SPEC.md §12), so an entry sized at exactly the
+ * floor would report n=8 after discarding. Discovered as a real T13
+ * integration bug during this ticket's own rehearsal run. */
+const TRANSFER_N = 12;
 
 /**
  * Resolves the Android target device, refusing to silently fall back to
@@ -52,10 +56,13 @@ const TRANSFER_N = 10;
  * emulator off -- that's what "full shutdown between iterations" means),
  * `firstAndroidDeviceSerial()`'s `?? serials[0]` fallback would silently
  * target the physical phone instead of failing loudly.
+ * @param {string|null} [config] RunContext's `config` field (T13: threaded
+ *   through to ensureEmulatorRunning so transfer.push boots the
+ *   config-appropriate AVD rather than always the tuned one).
  * @returns {Promise<string>}
  */
-async function resolveEmulatorSerial() {
-  await ensureEmulatorRunning();
+async function resolveEmulatorSerial(config) {
+  await ensureEmulatorRunning(config);
   const serial = await firstAndroidDeviceSerial();
   if (serial && serial.startsWith('emulator-')) return serial;
   throw new Error(
@@ -171,7 +178,7 @@ export function registerTransferBenchmarks() {
     unit: 'mb_per_s',
     async run(ctx) {
       if (ctx.leg === 'b') {
-        const serial = await resolveEmulatorSerial();
+        const serial = await resolveEmulatorSerial(ctx.config);
         /** @type {number[]} */
         const samples = [];
         for (let i = 0; i < TRANSFER_N; i++) {

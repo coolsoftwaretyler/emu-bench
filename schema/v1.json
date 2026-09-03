@@ -126,7 +126,11 @@
           "median": { "type": "number" },
           "p95": { "type": "number" },
           "p99": { "type": "number" },
-          "cv": { "type": "number" }
+          "cv": { "type": "number" },
+          "cvFlagged": {
+            "type": "boolean",
+            "description": "Optional: true when cv > 0.10 (PLAN.md §5 'flag CV > 10% as unstable'; SPEC.md §12). Additive-optional, so files written before this field existed remain valid."
+          }
         }
       }
     },
