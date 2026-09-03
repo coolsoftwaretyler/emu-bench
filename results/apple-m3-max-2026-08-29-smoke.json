@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "run": {
+    "timestamp": "2026-08-29T20:45:14.731Z",
+    "label": "smoke",
+    "suiteGitSha": "3e85020dcadf79b926c91d063f88f3f7b06f2f50"
+  },
+  "machine": {
+    "model": "Mac15,8",
+    "chip": "Apple M3 Max",
+    "pCores": 12,
+    "eCores": 4,
+    "ramGB": 48,
+    "macosVersion": "26.6.2",
+    "powerSource": "AC",
+    "thermalPressureStart": "nominal"
+  },
+  "toolchain": {
+    "xcode": "26.6",
+    "iosRuntime": "iOS 26.5 (26.5)",
+    "deviceType": "iPhone 17 Pro",
+    "emulatorVersion": "37.1.11.0",
+    "systemImage": "not installed",
+    "apiLevel": 0,
+    "ndk": "not installed",
+    "rnVersion": "n/a (rig not yet built — see T04)",
+    "maestro": "1.40.0",
+    "node": "v24.2.0"
+  },
+  "config": {
+    "avdTuned": {},
+    "avdDefault": {}
+  },
+  "benchmarks": [
+    {
+      "group": 1,
+      "id": "demo.noop_loop",
+      "leg": "a",
+      "config": "tuned",
+      "unit": "ns_per_op",
+      "n": 30,
+      "warmupsDiscarded": 2,
+      "samples": [
+        167,
+        166,
+        1458,
+        417,
+        125,
+        125,
+        125,
+        125,
+        875,
+        83,
+        83,
+        83,
+        83,
+        83,
+        84,
+        84,
+        83,
+        83,
+        84,
+        83,
+        83,
+        84,
+        83,
+        83,
+        83,
+        84,
+        83,
+        83,
+        84,
+        83
+      ],
+      "median": 83.5,
+      "p95": 875,
+      "p99": 1458,
+      "cv": 1.6122480623046538
+    }
+  ],
+  "skipped": [],
+  "notes": ""
+}

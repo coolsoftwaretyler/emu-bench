@@ -1,0 +1,25 @@
+node_modules/
+.DS_Store
+
+# Rig app / native build outputs (T04+)
+rig/**/android/app/build/
+rig/**/android/.gradle/
+rig/**/ios/build/
+rig/**/ios/Pods/
+kernels/build/
+
+# hello fixture app build outputs (T10) -- own .gitignore under hello/
+# covers local.properties etc.; these two catch Gradle/xcodebuild output
+# dirs specifically, matching the rig entries above.
+hello/**/android/app/build/
+hello/**/android/.gradle/
+hello/**/ios/build*/
+
+# Local scratch, never committed
+*.local.json
+*.local.bin
+*.local.yaml
+*.local.mov
+
+# Per-iteration Maestro debug logs for failed E2E/flake runs (T11)
+results/logs/

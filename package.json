@@ -1,0 +1,17 @@
+{
+  "name": "emu-bench",
+  "version": "0.1.0",
+  "description": "Portable benchmark suite quantifying Android Emulator overhead vs iOS Simulator overhead on Apple Silicon.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "bin": {
+    "emu-bench": "./bin/emu-bench"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

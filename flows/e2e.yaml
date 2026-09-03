@@ -1,0 +1,159 @@
+# e2e flow driver (ticket T11, PLAN.md §4 Group 6 "E2E flow" row: "launch ->
+# form fill -> scroll -> navigate -> assert"; SPEC.md §11 "one identical
+# Maestro flow"). One YAML file drives both platforms -- Maestro resolves
+# `appId`/`launchApp`/`openLink` against whichever device is targeted
+# (`-p android` / `-p ios`, or `--udid`), so no platform conditionals are
+# needed anywhere in this file (acceptance criterion 2: "platform
+# conditionals only in launch/app-id stanzas" -- this flow needs none at
+# all, since `appId` alone is already identical on both platforms, T04's
+# ANDROID_APP_ID/IOS_BUNDLE_ID both being `com.emubench.rig`).
+#
+# Steps, one deep-link launch per scene (flows/touch-latency.yaml's own
+# precedent: each flow stage is a separate scene launched by its own
+# `openLink`, not one continuous in-app navigation the flow YAML drives
+# start to finish -- SPEC.md §9's scene routing is deep-link-per-scene by
+# design, and reusing that here keeps every stage's params/testIDs exactly
+# as each scene already defines them):
+#
+#   1. form.basic  -- fill two inputs, tap submit (an in-scene "navigate":
+#      see rig/src/scenes/FormBasicScene.tsx's own doc for why this scene
+#      owns no NavigationContainer of its own).
+#   2. list.scroll?mode=manual -- swipe the list (T11: `mode=manual` param,
+#      rig/src/scenes/ListScrollScene.tsx, disables the scene's own
+#      deterministic RAF auto-scroll driver so this flow's swipe gestures
+#      are what actually moves the list).
+#   3. nav.transitions -- exercises the rig's one react-navigation stack
+#      (push/pop timer loop, T06); this flow only needs to observe it
+#      complete, not drive it itself (the loop runs on its own timer).
+#   4. Assert the terminal testID: `bench-done`, the harness-wide "scene
+#      finished" signal every scene renders once its `finish()` call
+#      resolves (rig/src/harness/SceneScreen.tsx) -- reused here rather than
+#      inventing a flow-specific final testID, since it is already the
+#      stable, scene-id-agnostic completion marker every scene in the rig
+#      guarantees.
+#
+# Timeouts are generous-but-equal across every step (ticket Risks: "keep
+# assertions on stable testIDs with generous-but-equal timeouts so the flow
+# measures the environment, not driver timing quirks") -- the same
+# `extendedWaitUntil`/timeout values run against both legs; a real
+# environment-caused slowdown should show up as a longer *measured
+# duration* (src/scenarios/e2e.js's own stopwatch, not Maestro's timeout),
+# never as a flow that only passes on one platform because its timeout
+# happened to be tuned per-leg.
+appId: com.emubench.rig
+---
+# --- 1. form.basic --------------------------------------------------------
+- launchApp:
+    clearState: false
+# waitForAnimationToEnd (2s): a genuine cold app *process* start -- the only
+# place in this flow one occurs -- needs the JS bundle to finish
+# initializing (Hermes bytecode eval + first render + the `Linking`
+# event-listener registration in App.tsx) before any deep link can land.
+# Diagnosed directly during this ticket's implementation: `e2e.duration`
+# force-stops the app before every iteration (SPEC.md §11's "cold app
+# start each time"), and against a *genuinely* cold process (not merely a
+# backgrounded one) Maestro's own `launchApp` "COMPLETED" fires as soon as
+# the launch intent is issued -- confirmed via maestro.log timestamps: one
+# real failed run showed `Launch app ... COMPLETED` at .668s and the first
+# `openLink` at .669s, ~1ms later, with the second `openLink` only 386ms
+# after that -- nowhere near enough time for a release RN app's JS thread
+# to come up. Both `openLink`s were then lost with no queuing/retry (10/10
+# reproductions of a genuine force-stop -> launchApp -> double-openLink
+# sequence failed identically, confirmed by reading each failure's
+# accessibility-tree dump: still the blank/loading screen or `bench-done`'s
+# own debug-list fallback, never `form-basic`'s testIDs) -- this is
+# deterministic given a cold process, not a timing-jitter race. Inserting
+# this single settle step (equally on both legs, no platform conditional)
+# made 10/10 fresh force-stop-then-launch cycles pass in a row on Android
+# during this ticket's own verification, where 0/10 passed without it.
+# Every later `openLink` in this flow launches into an already-warm JS
+# engine (this app is `singleTask`/re-opened, never process-killed again
+# mid-flow), so this wait is needed once, here, not before every step.
+# Timeout tuned empirically: 2000ms passed 9/10 fresh force-stop cycles in
+# one measurement batch (`waitForAnimationToEnd` itself sometimes overran
+# its own budget slightly -- 2207ms observed once -- and even then the
+# assertion still failed once after a further 10s, evidence this ceiling
+# genuinely needed headroom, not just better luck); 3500ms then passed
+# 12/12 in a follow-up batch. Kept generous rather than tuned to the exact
+# minimum (ticket Risks: "generous-but-equal timeouts").
+- waitForAnimationToEnd:
+    timeout: 3500
+# Double openLink (only here, right after cold launchApp): matches
+# flows/touch-latency.yaml's documented workaround (a launchApp immediately
+# followed by a single openLink reliably lands back on the debug scene-list
+# screen instead of the target scene there -- confirmed not a timing race).
+# NOT repeated before every later scene transition in this flow (see the
+# nav.transitions section below for why): a genuine native crash was found
+# during this ticket's implementation when the *second* openLink to
+# `nav.transitions` re-delivered the same URL to an already-mounted scene,
+# racing react-native-screens' native ScreenStackViewManager mid-mount
+# ("Index 1 out of bounds for length 1" in ScreenStackViewManager.
+# getChildAt / SurfaceMountingManager.removeViewAt -- a real react-
+# navigation/react-native-screens bug exposed by a duplicate deep link
+# arriving while a screen-stack view is still being constructed, not a
+# flow-timeout issue: the crash's own red-screen appeared well inside every
+# timeout budget). A single openLink is sufficient once the JS engine is
+# already warm from an earlier scene in the same process (confirmed: 9/9
+# clean passes -- one batch cut short by an unrelated harness timeout, not
+# a failure -- driving list.scroll and nav.transitions each with one
+# openLink after this section's cold-start double).
+- openLink: "emubench://scene/form.basic"
+- openLink: "emubench://scene/form.basic"
+- extendedWaitUntil:
+    visible:
+      id: "form-name-input"
+    timeout: 10000
+- tapOn:
+    id: "form-name-input"
+- inputText: "Ada Lovelace"
+- tapOn:
+    id: "form-email-input"
+- inputText: "ada@example.com"
+# The Android soft keyboard stays open after inputText and covers
+# `form-submit-button` below the fold (confirmed via a real failed run's
+# screenshot during this ticket's implementation: `tapOn: form-submit-button`
+# failed with "Element not found" while the keyboard was on screen -- iOS
+# doesn't exhibit this in the same way, but hideKeyboard is a no-op there if
+# nothing needs dismissing, so this step is safe and identical on both legs).
+- hideKeyboard
+- tapOn:
+    id: "form-submit-button"
+- extendedWaitUntil:
+    visible:
+      id: "form-basic-success"
+    timeout: 10000
+
+# --- 2. list.scroll?mode=manual --------------------------------------------
+# Single openLink -- JS engine already warm from form.basic (see the
+# cold-launch section's comment for why this differs from that step).
+- openLink: "emubench://scene/list.scroll?mode=manual&durationMs=4000&warmupMs=500"
+- extendedWaitUntil:
+    visible:
+      id: "list-scroll-list"
+    timeout: 10000
+- swipe:
+    id: "list-scroll-list"
+    direction: UP
+- swipe:
+    id: "list-scroll-list"
+    direction: UP
+- swipe:
+    id: "list-scroll-list"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: "bench-done"
+    timeout: 15000
+
+# --- 3. nav.transitions -----------------------------------------------------
+# Single openLink ONLY -- a duplicate here crashed the app (see the
+# cold-launch section's comment: a real react-native-screens native crash,
+# reproduced directly during this ticket's implementation, from a second
+# openLink racing this scene's own react-navigation mount).
+- openLink: "emubench://scene/nav.transitions?durationMs=3000&warmupMs=200&minTransitions=8"
+
+# --- 4. assert the terminal testID -----------------------------------------
+- extendedWaitUntil:
+    visible:
+      id: "bench-done"
+    timeout: 15000

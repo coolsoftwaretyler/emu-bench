@@ -1,6 +1,6 @@
 # T03: Portable C kernel suite (Group 1) + three-target build + runner integration
 
-**Status:** open
+**Status:** done (2026-08-29)
 **Depends on:** T01 (registry); T02 useful but not required (leg B needs NDK + an AVD)
 **Blocks:** T13 (orchestrator needs real benchmarks), T08 (shares the native build system)
 
@@ -17,10 +17,10 @@ Group 1 of PLAN.md §4: identical arm64 machine code run in all three legs isola
 
 ## Acceptance criteria
 
-- [ ] All three targets build warning-clean on this machine.
-- [ ] `./bin/emu-bench run --groups 1 --legs a` produces schema-valid results for every kernel on leg A.
-- [ ] With `bench-tuned` booted and a simulator booted: `--legs a,b,c` yields all kernels × all legs; a spot-check shows leg B sha256 within ~15% of leg A (sanity, not acceptance of H1).
-- [ ] `getpid` and `clock_gettime` results differ plausibly across legs (they exist to expose the vmexit path — identical numbers everywhere means the bench is broken, e.g. cached/vDSO'd getpid; investigate and document what each actually measures per platform).
+- [x] All three targets build warning-clean on this machine. Evidence: `make -C kernels clean && make -C kernels all` — macos (clang), android (NDK 27.1.12297006 clang, API 35, `-static`), iossim (`xcrun -sdk iphonesimulator clang -target arm64-apple-ios-simulator`) all built with zero warnings under `-Wall -Wextra -Wpedantic`; confirmed arm64 (`file`/`lipo` on macos+iossim, ELF aarch64 static on android).
+- [x] `./bin/emu-bench run --groups 1 --legs a` produces schema-valid results for every kernel on leg A. Evidence: wrote `results/apple-m3-max-2026-08-29-t03-lega-check.json`, schema-validated by the CLI itself before writing (exit 0); 9 entries (8 kernels + T01's `demo.noop_loop`), all leg=a, n=30, 0 skipped.
+- [x] With `bench-tuned` booted and a simulator booted: `--legs a,b,c` yields all kernels × all legs; a spot-check shows leg B sha256 within ~15% of leg A. Evidence: `./bin/emu-bench run --groups 1 --label kernels-check` → `results/apple-m3-max-2026-08-29-kernels-check.json`, 25 entries (8 kernels × 3 legs + demo), 0 skipped, all CV < 8%. sha256 leg B/leg A = 3403679230.5/3153875000 = **1.079× (7.9%)**, within ~15%.
+- [x] `getpid` and `clock_gettime` results differ plausibly across legs. Evidence (same run + direct spot-checks): `getpid_loop` medians — leg A 1.08 ns, leg B 98.5 ns (**~91× slower**, real vmexit cost), leg C 1.07 ns (Simulator = plain Mac process, ties leg A). `clock_gettime_loop` — leg A 15.8 ns, leg B 13.3 ns, leg C 15.6 ns (all close: vDSO-equivalent path works on every platform). Not identical everywhere, not nonsensical — see `kernels/main.c`'s `getpid_loop` comment block for the platform-specific mechanism investigated and documented (bionic caches getpid → forced via `syscall(SYS_getpid)`; Darwin's own getpid is measured, not cached, ~1ns, and `syscall(2)` is deprecated/unsupported there so it is not used).
 
 ## Verification
 

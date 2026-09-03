@@ -1,8 +1,8 @@
 # Tickets
 
-Work items for building emu-bench. Each ticket is self-contained: a fresh session should read [SPEC.md](../SPEC.md) (contract) and skim [PLAN.md](../PLAN.md) (methodology), then work the ticket without needing any prior conversation.
+Work items for building emu-bench. Each ticket is self-contained: a fresh session should read [SPEC.md](../SPEC.md) (contract) and skim [PLAN.md](../PLAN.md) (methodology), then work the ticket without needing any prior conversation. PLAN.md's Glossary appendix defines the domain terms used throughout these tickets. Use Sonnet models for initial work.
 
-**Working a ticket:** update its `Status:` line (open → in progress → done, with date), satisfy every acceptance checkbox with evidence, run the verification commands, and commit. **Never rewrite git history** — commit timestamps are this project's pre-registration evidence (SPEC §14).
+**Working a ticket:** update its `Status:` line (open → in progress → done, with date), satisfy every acceptance checkbox with evidence, run the verification commands, and commit. **Never rewrite git history** — commit timestamps are this project's pre-registration evidence: the hypotheses in PLAN.md must verifiably predate every results file in `results/`.
 
 ## Order and dependencies
 

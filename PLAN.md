@@ -41,9 +41,9 @@ What each leg actually is:
 
 Leg B pays for a guest Linux kernel, virtio devices, and GLES/Vulkan→gfxstream→Metal translation; leg C pays almost nothing. Quantifying that difference *is the experiment*.
 
-**Which legs run what:** leg A exists only where the workload can run as a plain Mac program — the Group 1 C suite. The rig app (Groups 2–5) builds for exactly two targets, so those groups compare emulator vs simulator head-to-head on identical code. Groups 6–7 measure the devices themselves (boot, install, power), where a "native Mac leg" has no meaning — also B vs C.
+**Which legs run what:** leg A exists only where the workload can run as a plain Mac program — the Group 1 C suite, plus a native Metal variant of the Group 4 fence probe so that result is a ratio too. The rig app (Groups 2–5) builds for exactly two targets, so those groups compare emulator vs simulator head-to-head on identical code. Groups 6–7 measure the devices themselves (boot, install, power), where a "native Mac leg" has no meaning — also B vs C.
 
-**Hardware:**  The suite is hardware-agnostic, portable software that anyone runs on their own Apple Silicon Mac; ratios-to-native-baseline make results comparable across machines, and machine fingerprinting in the results is a core feature. Our own run (M3 Max) is merely the reference dataset. The 10-minute thermal endurance scenario ships in the suite, and H9's thermal findings emerge from community runs on passively-cooled machines rather than from a machine we own.
+**Hardware:** The suite is hardware-agnostic, portable software that anyone runs on their own Apple Silicon Mac; ratios-to-native-baseline make results comparable across machines, and machine fingerprinting in the results is a core feature. Our own run (M3 Max) is merely the reference dataset. The 10-minute thermal endurance scenario ships in the suite, and H9's thermal findings emerge from community runs on passively-cooled machines rather than from a machine we own.
 
 ## 4. Benchmark matrix
 
@@ -192,12 +192,12 @@ The rules that keep runs honest and comparable across machines — enforced by t
 
 ## 6. Hypotheses — and what each result means
 
-Each row is a falsifiable bet. **Indicts** names the subsystem that's guilty if the hypothesis confirms. **Fixable by** classifies the engineering that could close the gap, using two tiers referenced throughout: **tier 1** = building a better product *around* the stock emulator without touching its internals (lifecycle management, window/presentation, dev-loop tooling); **tier 2** = engineering *inside* the virtualization stack itself (VMM tuning or patches, graphics stack, storage design).
+Each row is a falsifiable bet. **Indicts** names the subsystem that's guilty if the hypothesis confirms. Two tiers of fix are referenced in the reconciliation below: **tier 1** = building a better product *around* the stock emulator without touching its internals (lifecycle management, window/presentation, dev-loop tooling); **tier 2** = engineering *inside* the virtualization stack itself (VMM tuning or patches, graphics stack, storage design).
 
 | # | Hypothesis | If confirmed, indicts |
-|---|---|---|---|
+|---|---|---|
 | H1 | CPU kernels within 10% of native in the guest | Nothing — HVF is fine |
-| H2 | Guest syscall/timer/ctx-switch 2–10× worse | vmexit cost, guest clock config | 
+| H2 | Guest syscall/timer/ctx-switch 2–10× worse | vmexit cost, guest clock config |
 | H3 | Hermes within 15% | JS thread is fine; RN slowness isn't the engine |
 | H4 | Draw-call storm 2–5× worse; fill-rate near parity | gfxstream command serialization, not the GPU |
 | H5 | Texture churn significantly worse | Copy-heavy upload path (no zero-copy) |
