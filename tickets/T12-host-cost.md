@@ -1,6 +1,6 @@
 # T12: Host cost — power, RAM footprint, thermal endurance (Group 7)
 
-**Status:** open
+**Status:** parked — power.scroll and endurance need interactive sudo for powermetrics; a human can run sudo -v then re-run (2026-09-03)
 **Depends on:** T06 (`list.scroll` as the standard load), T02
 **Blocks:** T13
 
